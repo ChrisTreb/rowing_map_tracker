@@ -1,15 +1,12 @@
-import { Text, View } from "react-native";
+import { Stack } from "expo-router";
+import MainContainer from "./navigation/MainContainer";
 
 export default function Index() {
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Text>Edit app/index.tsx to edit this screen.</Text>
-    </View>
+    <>
+      {/* Définit les options pour cet écran dans la Stack Navigator d'Expo Router */}
+      <Stack.Screen options={{ headerShown: false }} />
+      <MainContainer />
+    </>
   );
 }
