@@ -6,6 +6,11 @@ export const initDb = async () => {
   try {
     db = await SQLite.openDatabaseAsync("rowing_tracker.db");
 
+    // Pour le développement, on peut réinitialiser la table à chaque lancement
+    await db.execAsync(`
+      DROP TABLE IF EXISTS races;
+    `);
+
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS races (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,6 +63,12 @@ export const getRaces = async () => {
     );
 
     console.log("Races fetched:", result);
+
+    if (result.length === 0) {
+      console.log("No races found in database");
+      result = [];
+    }
+
     return result;
   } catch (error) {
     console.error("Error fetching races:", error);

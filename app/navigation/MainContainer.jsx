@@ -26,7 +26,6 @@ function MainContainer() {
 
 
     return (
-        // Retire le NavigationContainer
         <>
             <StatusBar animated={true} backgroundColor="#1E90FF" />
 
@@ -52,7 +51,7 @@ function MainContainer() {
                         let rn = route.name;
 
                         if (rn === homeName) {
-                            iconName = focused ? "list" : "list-outline";
+                            iconName = focused ? "home" : "home-outline";
                         } else if (rn === userName) {
                             // Ajoute une icône pour l'écran UserScreen
                             iconName = focused ? "person" : "person-outline";

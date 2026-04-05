@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "rowing_map_tracker",
-    "slug": "rowing_map_tracker",
+    "slug": "rowingmaptracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.ctrl.rowingmaptracker"
     },
     "web": {
       "output": "static",
@@ -44,6 +45,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c10003a1-2f25-4085-af8c-478cd8260672"
+      }
+    },
+    "owner": "ctrl"
   }
 }

@@ -9,12 +9,14 @@ import {
   View
 } from "react-native";
 
+import Ionicons from "react-native-vector-icons/Ionicons";
+
 import MapView, { Marker, Polyline } from "react-native-maps";
 
 import { addRace, getRaces, initDb } from "../../../services/database";
 
 // CONFIG
-const MIN_DISTANCE = 0.005;
+const MIN_DISTANCE = 0.001; // 1m
 const MAX_SPEED = 40;
 const MAX_ACCURACY = 20;
 
@@ -52,8 +54,8 @@ const HomeScreen = () => {
     const a =
       Math.sin(Δφ / 2) ** 2 +
       Math.cos(φ1) *
-        Math.cos(φ2) *
-        Math.sin(Δλ / 2) ** 2;
+      Math.cos(φ2) *
+      Math.sin(Δλ / 2) ** 2;
 
     return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1000;
   };
@@ -84,8 +86,8 @@ const HomeScreen = () => {
       await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
-          timeInterval: 2000,
-          distanceInterval: 3,
+          timeInterval: 1000,
+          distanceInterval: 1,
         },
         (location) => {
           const { latitude, longitude, accuracy } =
@@ -196,19 +198,21 @@ const HomeScreen = () => {
         />
       </MapView>
 
-      <Text>Distance: {distance.toFixed(2)} km</Text>
-      <Text>Temps: {timeElapsed}s</Text>
-      <Text>Vitesse: {speed.toFixed(2)} km/h</Text>
-
       {!isTracking ? (
         <TouchableOpacity onPress={startTracking} style={styles.btn}>
-          <Text>START</Text>
+          <Ionicons name="play" size={20} color="white" />
         </TouchableOpacity>
       ) : (
         <TouchableOpacity onPress={stopTracking} style={styles.btnStop}>
-          <Text>STOP</Text>
+          <Ionicons name="stop" size={20} color="white" />
         </TouchableOpacity>
       )}
+
+      <View style={styles.infos}>
+        <Text>Distance: {distance.toFixed(2)} km</Text>
+        <Text>Temps: {timeElapsed}s</Text>
+        <Text>Vitesse: {speed.toFixed(2)} km/h</Text>
+      </View>
 
       <FlatList
         data={races}
@@ -222,11 +226,37 @@ const HomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  title: { fontSize: 20, textAlign: "center" },
-  map: { height: 300, width: "100%" },
-  btn: { backgroundColor: "green", padding: 10 },
-  btnStop: { backgroundColor: "red", padding: 10 },
+  container: {
+    flex: 1
+  },
+
+  title: {
+    fontSize: 30,
+    textAlign: "center",
+    marginVertical: 10
+  },
+
+  map: {
+    height: 300,
+    width: "100%"
+  },
+
+  btn: {
+    backgroundColor: "green",
+    padding: 10
+  },
+
+  btnStop: {
+    backgroundColor: "red",
+    padding: 10
+  },
+
+  infos: {
+    fontSize: 20,
+    flexDirection: "column",
+    justifyContent: "space-around",
+    marginVertical: 10
+  }
 });
 
 export default HomeScreen;
