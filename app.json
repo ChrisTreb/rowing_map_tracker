@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "rowingmaptracker",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
@@ -20,7 +20,12 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.ctrl.rowingmaptracker"
+      "package": "com.ctrl.rowingmaptracker",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "FOREGROUND_SERVICE"
+      ]
     },
     "web": {
       "output": "static",
