@@ -7,6 +7,12 @@
     "preview": {
       "distribution": "internal"
     },
+    "preview2": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {}
   }
 }
