@@ -1,8 +1,6 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { useEffect } from 'react'; // Importe useEffect
 import { StatusBar } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { initDb } from '../../services/database'; // Importe la fonction d'initialisation de la DB
 
 // Screens
 import HomeScreen from "./screens/HomeScreen";
@@ -17,13 +15,6 @@ const raceDetailName = "RaceDetail";
 const Tab = createBottomTabNavigator();
 
 function MainContainer() {
-
-    useEffect(() => {
-        initDb().catch(err => {
-            console.error("Failed to initialize database", err);
-        });
-    }, []); // S'exécute une seule fois au montage du composant
-
 
     return (
         <>

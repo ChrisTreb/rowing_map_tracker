@@ -17,8 +17,8 @@ import { addRace, getRaces, initDb } from "../../../services/database";
 
 // CONFIG
 const MIN_DISTANCE = 0.001; // 1m
-const MAX_SPEED = 40;
-const MAX_ACCURACY = 20;
+const MAX_SPEED = 200;
+const MAX_ACCURACY = 10;
 
 const HomeScreen = () => {
   const [isTracking, setIsTracking] = useState(false);
@@ -33,8 +33,12 @@ const HomeScreen = () => {
 
   useEffect(() => {
     const init = async () => {
-      await initDb();
-      await loadRaces();
+      await initDb().catch(err => {
+            console.error("Failed to initialize database", err);
+        });
+      await loadRaces().catch(err => {
+            console.error("Failed to load races", err);
+        });
     };
     init();
 
@@ -163,7 +167,7 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🚣 Tracker</Text>
+      <Text style={styles.title}><Ionicons name="compass" size={30} color="black" /> Tracker</Text>
 
       {/* 🗺️ CARTE */}
       <MapView
@@ -199,12 +203,12 @@ const HomeScreen = () => {
       </MapView>
 
       {!isTracking ? (
-        <TouchableOpacity onPress={startTracking} style={styles.btn}>
-          <Ionicons name="play" size={20} color="white" />
+        <TouchableOpacity onPress={startTracking} style={[styles.btn, styles.btnStart]}>
+          <Ionicons name="play" size={50} color="white" />
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity onPress={stopTracking} style={styles.btnStop}>
-          <Ionicons name="stop" size={20} color="white" />
+        <TouchableOpacity onPress={stopTracking} style={[styles.btn, styles.btnStop]}>
+          <Ionicons name="stop" size={50} color="white" />
         </TouchableOpacity>
       )}
 
@@ -214,6 +218,11 @@ const HomeScreen = () => {
         <Text>Vitesse: {speed.toFixed(2)} km/h</Text>
       </View>
 
+      {races.length === 0 || races.length === undefined ? (
+        <Text style={{ textAlign: "center", marginTop: 20 }}>
+          Aucune course enregistrée
+        </Text>
+      ) : (
       <FlatList
         data={races}
         keyExtractor={(item) => item.id.toString()}
@@ -221,6 +230,7 @@ const HomeScreen = () => {
           <Text>{item.name}</Text>
         )}
       />
+      )}
     </View>
   );
 };
@@ -242,13 +252,22 @@ const styles = StyleSheet.create({
   },
 
   btn: {
-    backgroundColor: "green",
-    padding: 10
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 15,
+    width: 200,
+    alignSelf: "center",
+    marginVertical: 30,
+    borderRadius: 10
+  },
+
+  btnStart: {
+    backgroundColor: "#4266f5"
   },
 
   btnStop: {
-    backgroundColor: "red",
-    padding: 10
+    backgroundColor: "#ff895e"
   },
 
   infos: {
