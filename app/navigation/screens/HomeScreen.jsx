@@ -2,31 +2,28 @@ import * as Location from 'expo-location';
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
-  FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from "react-native";
 
-import Ionicons from "react-native-vector-icons/Ionicons";
-
 import MapView, { Marker, Polyline } from "react-native-maps";
-
-import { addRace, getRaces, initDb } from "../../../services/database";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { addRace, initDb } from "../../../services/database";
 
 // CONFIG
 const MIN_DISTANCE = 0.001; // 1m
 const MAX_SPEED = 200;
-const MAX_ACCURACY = 10;
+const MAX_ACCURACY = 2;
+const INIT_LOCATION = {"latitude": 0, "longitude": 0};
 
 const HomeScreen = () => {
+  const currentLocation = useState(INIT_LOCATION)[0];
   const [isTracking, setIsTracking] = useState(false);
-  const [races, setRaces] = useState([]);
   const [distance, setDistance] = useState(0);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [path, setPath] = useState([]);
-
   const mapRef = useRef(null);
   const locationSubscription = useRef(null);
   const timerRef = useRef(null);
@@ -34,11 +31,8 @@ const HomeScreen = () => {
   useEffect(() => {
     const init = async () => {
       await initDb().catch(err => {
-            console.error("Failed to initialize database", err);
-        });
-      await loadRaces().catch(err => {
-            console.error("Failed to load races", err);
-        });
+        console.error("Failed to initialize database", err);
+      });
     };
     init();
 
@@ -64,11 +58,6 @@ const HomeScreen = () => {
     return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1000;
   };
 
-  const loadRaces = async () => {
-    const data = await getRaces();
-    setRaces(data);
-  };
-
   const startTracking = async () => {
     const { status } =
       await Location.requestForegroundPermissionsAsync();
@@ -89,7 +78,7 @@ const HomeScreen = () => {
     locationSubscription.current =
       await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.Balanced,
+          accuracy: Location.Accuracy.High,
           timeInterval: 1000,
           distanceInterval: 1,
         },
@@ -100,6 +89,8 @@ const HomeScreen = () => {
           if (accuracy > MAX_ACCURACY) return;
 
           const newPoint = { latitude, longitude };
+
+          currentLocation = newPoint;
 
           setPath((prev) => {
             if (prev.length === 0) return [newPoint];
@@ -158,8 +149,6 @@ const HomeScreen = () => {
       avgSpeed,
       JSON.stringify(path)
     );
-
-    await loadRaces();
   };
 
   const speed =
@@ -213,24 +202,11 @@ const HomeScreen = () => {
       )}
 
       <View style={styles.infos}>
-        <Text>Distance: {distance.toFixed(2)} km</Text>
-        <Text>Temps: {timeElapsed}s</Text>
-        <Text>Vitesse: {speed.toFixed(2)} km/h</Text>
+        <Text style={{ fontSize: 18, marginVertical: 2 }}>Distance: {distance.toFixed(2)} km</Text>
+        <Text style={{ fontSize: 18, marginVertical: 2 }}>Temps: {timeElapsed}s</Text>
+        <Text style={{ fontSize: 18, marginVertical: 2 }}>Vitesse: {speed.toFixed(2)} km/h</Text>
+        <Text style={{ fontSize: 18, marginVertical: 2 }}>Localisation: {currentLocation.latitude}, {currentLocation.longitude}</Text>
       </View>
-
-      {races.length === 0 || races.length === undefined ? (
-        <Text style={{ textAlign: "center", marginTop: 20 }}>
-          Aucune course enregistrée
-        </Text>
-      ) : (
-      <FlatList
-        data={races}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <Text>{item.name}</Text>
-        )}
-      />
-      )}
     </View>
   );
 };
@@ -271,8 +247,10 @@ const styles = StyleSheet.create({
   },
 
   infos: {
-    fontSize: 20,
+    width: "100%",
+    display: "flex",
     flexDirection: "column",
+    alignItems: "center",
     justifyContent: "space-around",
     marginVertical: 10
   }

@@ -48,7 +48,7 @@ function MainContainer() {
                             iconName = focused ? "person" : "person-outline";
                         } else if (rn === raceDetailName) {
                             // Ajoute une icône pour l'écran RaceDetailScreen
-                            iconName = focused ? "information" : "information-outline";
+                            iconName = focused ? "flag" : "flag-outline";
                         }
 
                         // You can return any component that you like here!
@@ -59,7 +59,7 @@ function MainContainer() {
                 <Tab.Screen name={homeName} component={HomeScreen} />
                 <Tab.Screen name={raceDetailName} component={RaceDetailScreen} />
                 <Tab.Screen name={userName} component={UserScreen} />
-                {}
+                { }
             </Tab.Navigator>
         </> // Utilisez un fragment React pour envelopper la StatusBar et le Tab.Navigator
     );
