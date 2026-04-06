@@ -73,6 +73,16 @@ export const getRaces = async () => {
   }
 };
 
+export const resetDatabase = async () => {
+  try {
+    await db.execAsync(`DELETE FROM races;`);
+    console.log("Database reset ✅");
+  } catch (error) {
+    console.error("Error resetting database:", error);
+    throw error;
+  }
+};
+
 export const seedRaces = async () => {
   try {
     const existing = await db.getAllAsync(`SELECT id FROM races LIMIT 1`);
