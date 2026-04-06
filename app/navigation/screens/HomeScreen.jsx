@@ -17,6 +17,7 @@ const HomeScreen = () => {
   const [distance, setDistance] = useState(0);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [path, setPath] = useState([]);
+  let raceName = "Course du " + new Date().toLocaleString();
 
   const webviewRef = useRef(null);
   const locationSubscription = useRef(null);
@@ -234,14 +235,15 @@ const HomeScreen = () => {
 
     if (path.length >= 2) {
       const duration = timeElapsed;
+      let avgSpeed = duration > 0 ? distance / (duration / 3600) : 0;
 
       await addRace(
-        "Course",
+        raceName,
         Date.now() - duration * 1000,
         Date.now(),
         duration,
-        distance,
-        duration > 0 ? distance / (duration / 3600) : 0,
+        distance.toFixed(2),
+        avgSpeed.toFixed(2),
         JSON.stringify(path)
       );
     }
