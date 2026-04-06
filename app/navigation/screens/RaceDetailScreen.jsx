@@ -1,197 +1,264 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View, Dimensions } from "react-native";
-import { LineChart } from "react-native-chart-kit";
-import { WebView } from 'react-native-webview';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { WebView } from "react-native-webview";
+import { getRaces } from "../../../services/database";
 
-const RaceDetailScreen = ({ route }) => {
-  const race = route?.params?.race;
-  const webviewRef = useRef(null);
-  const [points, setPoints] = useState([]);
+const RaceDetailScreen = () => {
+  const [races, setRaces] = useState([]);
+  const [selectedRace, setSelectedRace] = useState(null);
   const [replayIndex, setReplayIndex] = useState(0);
-  const [error, setError] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
-  const screenWidth = Dimensions.get("window").width;
+  const webviewRef = useRef(null);
 
-  // HTML/JS pour Leaflet avec IGN WMS
   const leafletHtml = `
     <!DOCTYPE html>
     <html>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
         <style>
-          body { margin: 0; padding: 0; }
-          #map { height: 100vh; width: 100vw; background: #f0f0f0; }
+          body { margin: 0; }
+          #map { height: 100vh; width: 100vw; }
+
+          .marker-inner {
+            width: 0;
+            height: 0;
+
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid #f95c5c;
+
+            transform-origin: 50% 70%;
+
+            filter: drop-shadow(0 0 3px white) drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+          }
+        
+          .marker-inner::after {
+            content: '';
+            position: absolute;
+            left: -4px;
+            top: 12px;
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+          }
         </style>
       </head>
       <body>
         <div id="map"></div>
-        <script>
-          var map = L.map('map', { zoomControl: false });
 
-          L.tileLayer.wms('https://data.geopf.fr/wms-r', {
-            layers: 'GEOGRAPHICALGRIDSYSTEMS.COASTALMAPS',
-            format: 'image/png',
-            transparent: true,
-            version: '1.3.0',
-            attribution: 'IGN'
+        <script>
+          var map = L.map('map').setView([48.39, -4.48], 15);
+
+          L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap France'
           }).addTo(map);
 
-          var polyline = L.polyline([], {color: '#4266f5', weight: 5}).addTo(map);
-          var marker = L.circleMarker([0,0], { radius: 6, color: 'white', fillColor: 'red', fillOpacity: 1 }).addTo(map);
+          var replayLine = L.polyline([], {
+            color: '#4266f5',
+            weight: 5
+          }).addTo(map);
 
-          window.addEventListener('message', function(event) {
+          var fullLine = L.polyline([], {
+            color: '#ccc',
+            weight: 3,
+            opacity: 0.5
+          }).addTo(map);
+
+          var marker = null;
+
+          function handleMessage(event) {
             var data = JSON.parse(event.data);
-            if (data.type === 'SET_DATA') {
-               var latlngs = data.points.map(p => [p.latitude, p.longitude]);
-               if (latlngs.length > 0) {
-                 map.fitBounds(latlngs);
-               }
+
+            if (data.fullPath) {
+              var latlngs = data.fullPath.map(p => [p.latitude, p.longitude]);
+              fullLine.setLatLngs(latlngs);
+              map.fitBounds(latlngs);
             }
-            if (data.type === 'UPDATE_REPLAY') {
-              var currentPoints = data.visiblePoints.map(p => [p.latitude, p.longitude]);
-              polyline.setLatLngs(currentPoints);
-              if (currentPoints.length > 0) {
-                marker.setLatLng(currentPoints[currentPoints.length - 1]);
+
+            if (data.resetReplay) {
+              replayLine.setLatLngs([]);
+            }
+
+            if (data.replayPoint) {
+              var point = [data.replayPoint.latitude, data.replayPoint.longitude];
+
+              replayLine.addLatLng(point);
+
+              if (!marker) {
+                marker = L.marker(point, {
+                  icon: L.divIcon({
+                    className: '',
+                    html: '<div class="marker-inner"></div>'
+                  })
+                }).addTo(map);
+              } else {
+                marker.setLatLng(point);
               }
+
+              var zoom = 17;
+
+              if (data.speed) {
+                if (data.speed < 5) zoom = 18;
+                else if (data.speed < 15) zoom = 17;
+                else zoom = 16;
+              }
+
+              map.setView(point, zoom);
             }
-          });
+          }
+
+          document.addEventListener("message", handleMessage);
+          window.addEventListener("message", handleMessage);
         </script>
       </body>
     </html>
   `;
 
   useEffect(() => {
-    if (!race) {
-      setError("Aucune course fournie.");
-      return;
-    }
+    const load = async () => {
+      const data = await getRaces();
+      setRaces(data);
+    };
+    load();
+  }, []);
 
-    if (!race.route_data) {
-      setError("Aucune donnée GPS disponible.");
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(race.route_data);
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        setError("Données GPS invalides.");
-        return;
-      }
-
-      setPoints(parsed);
-
-      // ▶️ replay
-      let i = 0;
-      const interval = setInterval(() => {
-        i++;
-        if (i >= parsed.length) {
-          clearInterval(interval);
-        } else {
-          setReplayIndex(i);
-        }
-      }, 300);
-
-      return () => clearInterval(interval);
-    } catch (e) {
-      setError("Impossible de lire la course.");
-    }
-  }, [race]);
-
-  // Envoyer les points à la WebView une fois chargée
-  const onMapLoad = () => {
-    if (webviewRef.current && points.length > 0) {
-      webviewRef.current.postMessage(JSON.stringify({
-        type: 'SET_DATA',
-        points: points
-      }));
-    }
-  };
-
-  // Mettre à jour le tracé du replay
+  // ▶️ Replay loop
   useEffect(() => {
-    if (webviewRef.current && points.length > 0) {
-      webviewRef.current.postMessage(JSON.stringify({
-        type: 'UPDATE_REPLAY',
-        visiblePoints: points.slice(0, replayIndex + 1)
-      }));
+    let interval;
+
+    if (isPlaying && selectedRace) {
+      const path = JSON.parse(selectedRace.route_data);
+
+      interval = setInterval(() => {
+        setReplayIndex((i) => {
+          if (i >= path.length - 1) {
+            setIsPlaying(false);
+            return i;
+          }
+          return i + 1;
+        });
+      }, 400);
     }
-  }, [replayIndex, points]);
 
-  if (error) {
+    return () => clearInterval(interval);
+  }, [isPlaying, selectedRace]);
+
+  // 📡 envoyer path complet
+  useEffect(() => {
+    if (!selectedRace || !webviewRef.current) return;
+
+    const path = JSON.parse(selectedRace.route_data);
+
+    webviewRef.current.postMessage(JSON.stringify({
+      fullPath: path,
+      resetReplay: true
+    }));
+  }, [selectedRace]);
+
+  // 📡 envoyer point courant
+  useEffect(() => {
+    if (!selectedRace || !webviewRef.current) return;
+
+    const path = JSON.parse(selectedRace.route_data);
+    const point = path[replayIndex];
+
+    webviewRef.current.postMessage(JSON.stringify({
+      replayPoint: point
+    }));
+  }, [replayIndex]);
+
+  if (!selectedRace) {
     return (
-      <View style={styles.center}>
-        <Text style={{ color: "red" }}>{error}</Text>
+      <View style={styles.container}>
+        <Text style={styles.title}>Mes courses</Text>
+
+        <FlatList
+          data={races}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => {
+                setSelectedRace(item);
+                setReplayIndex(0);
+              }}
+            >
+              <Text style={styles.cardTitle}>{item.name}</Text>
+              <Text>{item.distance} km</Text>
+              <Text>{item.duration}s</Text>
+            </TouchableOpacity>
+          )}
+        />
       </View>
     );
   }
-
-  if (points.length === 0) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#4266f5" />
-      </View>
-    );
-  }
-
-  // Calcul des vitesses pour le graph
-  const speeds = points.map((p, i) => {
-    // Si on a les données de vitesse réelles dans le point on les utilise
-    // Sinon on simule ou on affiche 0 pour l'exemple
-    return i % 5 === 0 ? Math.random() * 15 : 10; // Exemple
-  }).slice(0, 20); // Limiter pour l'affichage
 
   return (
     <View style={styles.container}>
-      <View style={styles.mapContainer}>
-        <WebView
-          ref={webviewRef}
-          originWhitelist={['*']}
-          source={{ html: leafletHtml, baseUrl: 'https://localhost' }}
-          userAgent="RowingMapTrackerApp"
-          onLoad={onMapLoad}
-          style={styles.map}
-        />
-      </View>
+      <TouchableOpacity onPress={() => {
+        setSelectedRace(null);
+        setIsPlaying(false);
+      }}>
+        <Text style={styles.back}>⬅ Retour</Text>
+      </TouchableOpacity>
 
-      <View style={styles.details}>
-        <Text style={styles.stats}>Distance: {race.distance?.toFixed(2) || 0} km</Text>
-        <Text style={styles.stats}>Vitesse moy: {race.avg_speed?.toFixed(2) || 0} km/h</Text>
+      <WebView
+        ref={webviewRef}
+        originWhitelist={['*']}
+        source={{ html: leafletHtml }}
+        style={{ height: 350 }}
+      />
 
-        <LineChart
-          data={{
-            labels: ["Start", "...", "End"],
-            datasets: [{ data: speeds.length > 0 ? speeds : [0] }],
-          }}
-          width={screenWidth - 40}
-          height={180}
-          chartConfig={{
-            backgroundColor: "#ffffff",
-            backgroundGradientFrom: "#ffffff",
-            backgroundGradientTo: "#ffffff",
-            decimalPlaces: 1,
-            color: (opacity = 1) => `rgba(66, 102, 245, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-            style: { borderRadius: 16 },
-            propsForDots: { r: "3", strokeWidth: "2", stroke: "#4266f5" }
-          }}
-          bezier
-          style={styles.chart}
-        />
+      <View style={styles.controls}>
+        <TouchableOpacity onPress={() => setIsPlaying(true)}>
+          <Text style={styles.control}>▶️</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setIsPlaying(false)}>
+          <Text style={styles.control}>⏸</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => {
+          setIsPlaying(false);
+          setReplayIndex(0);
+
+          webviewRef.current.postMessage(JSON.stringify({
+            resetReplay: true
+          }));
+        }}>
+          <Text style={styles.control}>⏹</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  mapContainer: { height: '40%', width: '100%' },
-  map: { flex: 1 },
-  details: { padding: 20 },
-  stats: { fontSize: 18, fontWeight: 'bold', marginBottom: 5 },
-  chart: { marginVertical: 8, borderRadius: 16 }
+  container: { flex: 1, backgroundColor: "#fff", padding: 10 },
+  title: { fontSize: 24, textAlign: "center", marginVertical: 10 },
+
+  card: {
+    padding: 15,
+    marginVertical: 5,
+    backgroundColor: "#f2f2f2",
+    borderRadius: 10,
+  },
+
+  cardTitle: { fontSize: 18, fontWeight: "bold" },
+
+  controls: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 20,
+  },
+
+  control: { fontSize: 30 },
+
+  back: { fontSize: 18, marginBottom: 10 },
 });
 
 export default RaceDetailScreen;

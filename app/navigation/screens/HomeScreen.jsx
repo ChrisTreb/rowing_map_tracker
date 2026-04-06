@@ -17,11 +17,31 @@ const HomeScreen = () => {
   const [distance, setDistance] = useState(0);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [path, setPath] = useState([]);
+  const [bearing, setBearing] = useState(0);
+  const [currentSpeed, setCurrentSpeed] = useState(0);
+
   let raceName = "Course du " + new Date().toLocaleString();
 
   const webviewRef = useRef(null);
   const locationSubscription = useRef(null);
   const timerRef = useRef(null);
+
+  // 🔥 CALCUL DIRECTION
+  const getBearing = (lat1, lon1, lat2, lon2) => {
+    const toRad = (deg) => deg * Math.PI / 180;
+    const toDeg = (rad) => rad * 180 / Math.PI;
+
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δλ = toRad(lon2 - lon1);
+
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x =
+      Math.cos(φ1) * Math.sin(φ2) -
+      Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  };
 
   const leafletHtml = `
     <!DOCTYPE html>
@@ -33,6 +53,31 @@ const HomeScreen = () => {
         <style>
           body { margin: 0; }
           #map { height: 100vh; width: 100vw; }
+
+          .custom-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .marker-inner {
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid #4266f5;
+            transform-origin: center;
+          }
+          .marker-inner::after {
+            content: '';
+            position: absolute;
+            left: -4px;
+            top: 12px;
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+          }
         </style>
       </head>
       <body>
@@ -52,20 +97,27 @@ const HomeScreen = () => {
           function handleMessage(event) {
             try {
               var data = JSON.parse(event.data);
-              console.log("DATA:", data);
-
               var newPoint = [data.lat, data.lng];
 
-              // Marker position actuelle
+              // ✅ Marker stable
               if (!currentMarker) {
-                currentMarker = L.circleMarker(newPoint, {
-                  radius: 8,
-                  color: 'white',
-                  fillColor: '#4266f5',
-                  fillOpacity: 1
+                currentMarker = L.marker(newPoint, {
+                  icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: '<div class="marker-inner"></div>'
+                  })
                 }).addTo(map);
               } else {
                 currentMarker.setLatLng(newPoint);
+              }
+
+              // ✅ rotation propre
+              var el = currentMarker.getElement();
+              if (el) {
+                var inner = el.querySelector('.marker-inner');
+                if (inner) {
+                  inner.style.transform = 'rotate(' + (data.bearing || 0) + 'deg)';
+                }
               }
 
               // Path
@@ -79,7 +131,15 @@ const HomeScreen = () => {
               }
 
               if (data.follow) {
-                map.setView(newPoint);
+                var zoom = 17;
+
+                if (data.speed) {
+                  if (data.speed < 5) zoom = 18;
+                  else if (data.speed < 15) zoom = 17;
+                  else zoom = 16;
+                }
+
+                map.setView(newPoint, zoom);
               }
 
             } catch (e) {
@@ -87,10 +147,8 @@ const HomeScreen = () => {
             }
           }
 
-          // 🔥 ANDROID FIX
           document.addEventListener("message", handleMessage);
           window.addEventListener("message", handleMessage);
-
         </script>
       </body>
     </html>
@@ -100,7 +158,7 @@ const HomeScreen = () => {
     const init = async () => {
       try {
         await initDb();
-        await seedRaces(); // Ajoutez cette ligne pour insérer des données de test
+        await seedRaces();
 
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
@@ -125,30 +183,22 @@ const HomeScreen = () => {
 
     return () => {
       locationSubscription.current?.remove();
-      locationSubscription.current = null;
-
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
 
   useEffect(() => {
     if (webviewRef.current) {
-      const message = JSON.stringify({
+      webviewRef.current.postMessage(JSON.stringify({
         lat: currentLocation.latitude,
         lng: currentLocation.longitude,
         path,
         isTracking,
-        follow: true
-      });
-
-      console.log("SEND:", message);
-
-      webviewRef.current.postMessage(message);
+        follow: true,
+        bearing
+      }));
     }
-  }, [currentLocation, path, isTracking]);
+  }, [currentLocation, path, isTracking, bearing]);
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3;
@@ -166,7 +216,6 @@ const HomeScreen = () => {
 
   const startTracking = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
-
     if (status !== "granted") {
       Alert.alert("Permission refusée");
       return;
@@ -191,7 +240,6 @@ const HomeScreen = () => {
       },
       (location) => {
         const { latitude, longitude, accuracy } = location.coords;
-
         if (accuracy > MAX_ACCURACY) return;
 
         const newPoint = { latitude, longitude };
@@ -201,6 +249,7 @@ const HomeScreen = () => {
           if (prev.length === 0) return [newPoint];
 
           const last = prev[prev.length - 1];
+
           const d = calculateDistance(
             last.latitude,
             last.longitude,
@@ -210,8 +259,26 @@ const HomeScreen = () => {
 
           if (d < MIN_DISTANCE) return prev;
 
-          const speed = d / (1 / 3600);
+          const speed = d / (1 / 3600); // km/h
+
           if (speed > MAX_SPEED) return prev;
+
+          // ✅ vitesse instantanée
+          const smoothSpeed = (oldSpeed, newSpeed) => {
+            return oldSpeed * 0.7 + newSpeed * 0.3;
+          };
+
+          setCurrentSpeed(prev => smoothSpeed(prev, speed));
+
+          // ✅ bearing
+          const newBearing = getBearing(
+            last.latitude,
+            last.longitude,
+            latitude,
+            longitude
+          );
+
+          setBearing(newBearing);
 
           setDistance(dist => dist + d);
           return [...prev, newPoint];
@@ -224,12 +291,8 @@ const HomeScreen = () => {
 
   const stopTracking = async () => {
     locationSubscription.current?.remove();
-    locationSubscription.current = null;
 
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    if (timerRef.current) clearInterval(timerRef.current);
 
     setIsTracking(false);
 
@@ -251,9 +314,6 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        <Ionicons name="compass" size={30} color="#4266f5" /> Tracker
-      </Text>
 
       <View style={styles.mapContainer}>
         <WebView
@@ -262,7 +322,6 @@ const HomeScreen = () => {
           source={{ html: leafletHtml }}
           javaScriptEnabled={true}
           domStorageEnabled={true}
-          userAgent="Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 Chrome/100 Safari/537.36"
           style={styles.map}
         />
       </View>
@@ -278,11 +337,39 @@ const HomeScreen = () => {
       )}
 
       <View style={styles.infos}>
-        <Text style={styles.infoText}>Distance: {distance.toFixed(2)} km</Text>
-        <Text style={styles.infoText}>Temps: {timeElapsed}s</Text>
-        <Text style={styles.infoText}>
-          Vitesse: {(timeElapsed > 0 ? distance / (timeElapsed / 3600) : 0).toFixed(2)} km/h
-        </Text>
+        {/* Ligne 1 */}
+        <View style={styles.row}>
+          <View style={styles.card}>
+            <Text style={styles.label}>Distance</Text>
+            <Text style={styles.value}>{distance.toFixed(2)}</Text>
+            <Text style={styles.unit}>km</Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>Temps</Text>
+            <Text style={styles.value}>{timeElapsed}</Text>
+            <Text style={styles.unit}>sec</Text>
+          </View>
+        </View>
+
+        {/* Ligne 2 */}
+        <View style={styles.row}>
+          <View style={styles.card}>
+            <Text style={styles.label}>Vitesse actuelle</Text>
+            <Text style={[styles.value, { color: "#4266f5" }]}>
+              {currentSpeed.toFixed(2)}
+            </Text>
+            <Text style={styles.unit}>km/h</Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>Vitesse moyenne</Text>
+            <Text style={styles.value}>
+              {(timeElapsed > 0 ? distance / (timeElapsed / 3600) : 0).toFixed(2)}
+            </Text>
+            <Text style={styles.unit}>km/h</Text>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -293,19 +380,65 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, textAlign: "center", marginVertical: 15 },
   mapContainer: { height: 350 },
   map: { flex: 1 },
+
   btn: {
     alignItems: "center",
     justifyContent: "center",
     width: 80,
     height: 80,
     alignSelf: "center",
-    marginTop: 15,
+    marginTop: -20,
     borderRadius: 40
   },
   btnStart: { backgroundColor: "#4266f5" },
   btnStop: { backgroundColor: "#ff895e" },
-  infos: { marginTop: 20, alignItems: "center" },
-  infoText: { fontSize: 18 }
+  infos: {
+    marginTop: 20,
+    paddingHorizontal: 15,
+  },
+
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+
+  card: {
+    flex: 1,
+    backgroundColor: "#f8f9ff",
+    borderRadius: 16,
+    padding: 15,
+    marginHorizontal: 5,
+    alignItems: "center",
+
+    // shadow iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+
+    // shadow Android
+    elevation: 3,
+  },
+
+  label: {
+    fontSize: 13,
+    color: "#888",
+    marginBottom: 5,
+  },
+
+  value: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#222",
+  },
+
+  unit: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 2,
+  },
+
 });
 
 export default HomeScreen;
