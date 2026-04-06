@@ -1,9 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
-import { Ionicons } from '@expo/vector-icons';
-import { addRace, initDb } from "../../../services/database";
+import { addRace, initDb, seedRaces } from "../../../services/database";
 
 // CONFIG
 const MIN_DISTANCE = 0.005;
@@ -99,6 +99,7 @@ const HomeScreen = () => {
     const init = async () => {
       try {
         await initDb();
+        await seedRaces(); // Ajoutez cette ligne pour insérer des données de test
 
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {

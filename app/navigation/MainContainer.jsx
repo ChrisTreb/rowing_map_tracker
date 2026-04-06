@@ -1,16 +1,18 @@
+import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "react-native";
-import { Ionicons } from '@expo/vector-icons';
 
 // Screens
 import HomeScreen from "./screens/HomeScreen";
 import RaceDetailScreen from "./screens/RaceDetailScreen";
+import RaceListScreen from "./screens/RaceListScreen";
 import UserScreen from "./screens/UserScreen";
 
 //Screen names
 const homeName = "Home";
 const userName = "User";
-const raceDetailName = "RaceDetail";
+const raceDetailName = "Race Detail";
+const raceListName = "Race List";
 
 const Tab = createBottomTabNavigator();
 
@@ -49,6 +51,9 @@ function MainContainer() {
                         } else if (rn === raceDetailName) {
                             // Ajoute une icône pour l'écran RaceDetailScreen
                             iconName = focused ? "flag" : "flag-outline";
+                        } else if (rn === raceListName) {
+                            // Ajoute une icône pour l'écran RaceListScreen
+                            iconName = focused ? "list" : "list-outline";
                         }
 
                         // You can return any component that you like here!
@@ -59,6 +64,7 @@ function MainContainer() {
                 <Tab.Screen name={homeName} component={HomeScreen} />
                 <Tab.Screen name={raceDetailName} component={RaceDetailScreen} />
                 <Tab.Screen name={userName} component={UserScreen} />
+                <Tab.Screen name={raceListName} component={RaceListScreen} />
                 { }
             </Tab.Navigator>
         </> // Utilisez un fragment React pour envelopper la StatusBar et le Tab.Navigator

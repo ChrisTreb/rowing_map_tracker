@@ -72,3 +72,62 @@ export const getRaces = async () => {
     throw error;
   }
 };
+
+export const seedRaces = async () => {
+  try {
+    const existing = await db.getAllAsync(`SELECT id FROM races LIMIT 1`);
+
+    if (existing.length > 0) {
+      console.log("Seed déjà effectué");
+      return;
+    }
+
+    console.log("Seeding database...");
+
+    const now = Date.now();
+
+    const fakePath = (lat, lng) => {
+      return JSON.stringify([
+        { latitude: lat, longitude: lng },
+        { latitude: lat + 0.001, longitude: lng + 0.001 },
+        { latitude: lat + 0.002, longitude: lng + 0.0015 },
+        { latitude: lat + 0.003, longitude: lng + 0.002 }
+      ]);
+    };
+
+    await addRace(
+      "Sortie matinale",
+      now - 86400000,
+      now - 86000000,
+      2400,
+      5.2,
+      7.8,
+      fakePath(48.39, -4.48)
+    );
+
+    await addRace(
+      "Session cardio",
+      now - 172800000,
+      now - 172000000,
+      3600,
+      8.5,
+      8.5,
+      fakePath(48.391, -4.482)
+    );
+
+    await addRace(
+      "Balade tranquille",
+      now - 259200000,
+      now - 258000000,
+      1800,
+      3.1,
+      6.2,
+      fakePath(48.388, -4.479)
+    );
+
+    console.log("Seed terminé ✅");
+
+  } catch (error) {
+    console.error("Erreur seed:", error);
+  }
+};
