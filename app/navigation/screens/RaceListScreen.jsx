@@ -6,8 +6,9 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Alert
 } from "react-native";
-import { getRaces, resetDatabase } from "../../../services/database";
+import { getRaces, resetDatabase, seedRaces } from "../../../services/database";
 
 const RaceListScreen = () => {
     const [races, setRaces] = useState([]);
