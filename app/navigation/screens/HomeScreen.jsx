@@ -7,6 +7,8 @@ import { addRace, initDb, seedRaces } from "../../../services/database";
 
 // CONFIG
 const MIN_DISTANCE = 0.005;
+const MIN_SPEED_DISTANCE = 0.01; // 10 mètres
+const MIN_TIME = 1; // secondes
 const MAX_SPEED = 200;
 const MAX_ACCURACY = 10;
 const INIT_LOCATION = { latitude: 48.39, longitude: -4.48 };
@@ -19,6 +21,7 @@ const HomeScreen = () => {
   const [path, setPath] = useState([]);
   const [bearing, setBearing] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
+  const lastTimestamp = useRef(null);
 
   let raceName = "Course du " + new Date().toLocaleString();
 
@@ -132,13 +135,6 @@ const HomeScreen = () => {
 
               if (data.follow) {
                 var zoom = 17;
-
-                if (data.speed) {
-                  if (data.speed < 5) zoom = 18;
-                  else if (data.speed < 15) zoom = 17;
-                  else zoom = 16;
-                }
-
                 map.setView(newPoint, zoom);
               }
 
@@ -259,16 +255,37 @@ const HomeScreen = () => {
 
           if (d < MIN_DISTANCE) return prev;
 
-          const speed = d / (1 / 3600); // km/h
+          const now = location.timestamp;
+
+          let speed = 0;
+
+          if (lastTimestamp.current) {
+            const deltaTime = (now - lastTimestamp.current) / 1000; // sec
+
+            if (deltaTime >= MIN_TIME) {
+
+              // 🔥 ignorer petits mouvements GPS
+              if (d < MIN_SPEED_DISTANCE) {
+                speed = 0;
+              } else {
+                speed = d / (deltaTime / 3600); // km/h
+              }
+
+            }
+          }
+
+          lastTimestamp.current = now;
 
           if (speed > MAX_SPEED) return prev;
 
           // ✅ vitesse instantanée
           const smoothSpeed = (oldSpeed, newSpeed) => {
-            return oldSpeed * 0.7 + newSpeed * 0.3;
+            return oldSpeed * 0.8 + newSpeed * 0.2;
           };
 
           setCurrentSpeed(prev => smoothSpeed(prev, speed));
+
+          if (speed < 1) speed = 0;
 
           // ✅ bearing
           const newBearing = getBearing(

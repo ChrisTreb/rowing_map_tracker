@@ -1,3 +1,4 @@
+import Slider from '@react-native-community/slider';
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from "react-native-webview";
@@ -8,8 +9,41 @@ const RaceDetailScreen = () => {
   const [selectedRace, setSelectedRace] = useState(null);
   const [replayIndex, setReplayIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-
   const webviewRef = useRef(null);
+  const lastBearing = useRef(0);
+  const smooth = (a, b) => a + (b - a) * 0.2;
+  const path = selectedRace ? JSON.parse(selectedRace.route_data) : [];
+  const pathLength = path.length || 0;
+
+  const getBearing = (lat1, lon1, lat2, lon2) => {
+    const toRad = (deg) => deg * Math.PI / 180;
+    const toDeg = (rad) => rad * 180 / Math.PI;
+
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δλ = toRad(lon2 - lon1);
+
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x =
+      Math.cos(φ1) * Math.sin(φ2) -
+      Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  };
+
+  const formatTime = (index, total) => {
+    if (!selectedRace || total === 0) return "0:00";
+
+    const percent = index / total;
+    const totalDuration = selectedRace.duration || 0;
+
+    const currentTime = Math.floor(totalDuration * percent);
+
+    const min = Math.floor(currentTime / 60);
+    const sec = currentTime % 60;
+
+    return `${min}:${sec.toString().padStart(2, '0')}`;
+  };
 
   const leafletHtml = `
     <!DOCTYPE html>
@@ -97,15 +131,17 @@ const RaceDetailScreen = () => {
                 }).addTo(map);
               } else {
                 marker.setLatLng(point);
+
+                var el = marker.getElement();
+                if (el) {
+                  var inner = el.querySelector('.marker-inner');
+                  if (inner) {
+                    inner.style.transform = 'rotate(' + (data.bearing || 0) + 'deg)';
+                  }
+                }
               }
 
               var zoom = 17;
-
-              if (data.speed) {
-                if (data.speed < 5) zoom = 18;
-                else if (data.speed < 15) zoom = 17;
-                else zoom = 16;
-              }
 
               map.setView(point, zoom);
             }
@@ -152,23 +188,32 @@ const RaceDetailScreen = () => {
     if (!selectedRace || !webviewRef.current) return;
 
     const path = JSON.parse(selectedRace.route_data);
-
-    webviewRef.current.postMessage(JSON.stringify({
-      fullPath: path,
-      resetReplay: true
-    }));
-  }, [selectedRace]);
-
-  // 📡 envoyer point courant
-  useEffect(() => {
-    if (!selectedRace || !webviewRef.current) return;
-
-    const path = JSON.parse(selectedRace.route_data);
     const point = path[replayIndex];
 
+    let bearing = 0;
+
+    if (replayIndex > 0) {
+      const prev = path[replayIndex - 1];
+
+      let rawBearing = getBearing(
+        prev.latitude,
+        prev.longitude,
+        point.latitude,
+        point.longitude
+      );
+
+      // 🔥 lissage
+      let bearing = smooth(lastBearing.current, rawBearing);
+
+      // sauvegarde
+      lastBearing.current = bearing;
+    }
+
     webviewRef.current.postMessage(JSON.stringify({
-      replayPoint: point
+      replayPoint: point,
+      bearing
     }));
+
   }, [replayIndex]);
 
   if (!selectedRace) {
@@ -233,6 +278,28 @@ const RaceDetailScreen = () => {
           <Text style={styles.control}>⏹</Text>
         </TouchableOpacity>
       </View>
+      <View style={styles.timelineContainer}>
+        <Slider
+          style={{ width: "100%", height: 40 }}
+          minimumValue={0}
+          maximumValue={pathLength > 0 ? pathLength - 1 : 0}
+          value={replayIndex}
+          onSlidingStart={() => setIsPlaying(false)}
+          onValueChange={(value) => {
+            setIsPlaying(false); // pause quand on touche
+            setReplayIndex(Math.floor(value));
+          }}
+
+          minimumTrackTintColor="#4266f5"
+          maximumTrackTintColor="#ccc"
+          thumbTintColor="#4266f5"
+        />
+
+        <View style={styles.timelineLabels}>
+          <Text>{formatTime(replayIndex, pathLength)}</Text>
+          <Text>{formatTime(pathLength, pathLength)}</Text>
+        </View>
+      </View>
     </View>
   );
 };
@@ -259,6 +326,17 @@ const styles = StyleSheet.create({
   control: { fontSize: 30 },
 
   back: { fontSize: 18, marginBottom: 10 },
+  timelineContainer: {
+    width: "100%",
+    marginTop: 10,
+    paddingHorizontal: 10,
+  },
+
+  timelineLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: -5,
+  },
 });
 
 export default RaceDetailScreen;
