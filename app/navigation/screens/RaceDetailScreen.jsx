@@ -2,19 +2,48 @@ import Slider from '@react-native-community/slider';
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from "react-native-webview";
-import { getRaces } from "../../../services/database";
+import { dummyPositions, getRaceParticipantPositionsByParticipantId } from "../../../services/database";
 
 const RaceDetailScreen = () => {
   const [races, setRaces] = useState([]);
   const [selectedRace, setSelectedRace] = useState(null);
   const [replayIndex, setReplayIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+
   const webviewRef = useRef(null);
   const lastBearing = useRef(0);
-  const smooth = (a, b) => a + (b - a) * 0.2;
-  const path = selectedRace ? JSON.parse(selectedRace.route_data) : [];
-  const pathLength = path.length || 0;
 
+  const smooth = (a, b) => a + (b - a) * 0.2;
+
+  // 🔥 GROUP + CLEAN
+  const groupByRace = (positions) => {
+    const map = {};
+
+    positions.forEach(p => {
+      if (!map[p.rpp_rp_id]) map[p.rpp_rp_id] = [];
+      map[p.rpp_rp_id].push(p);
+    });
+
+    return Object.values(map).map(points =>
+      points
+        .sort((a, b) => a.rp_date - b.rp_date)
+        .filter((p, i, arr) => {
+          if (i === 0) return true;
+
+          const prev = arr[i - 1];
+
+          const dLat = Math.abs(p.rpp_viewport_latitude - prev.rpp_viewport_latitude);
+          const dLng = Math.abs(p.rpp_viewport_longitude - prev.rpp_viewport_longitude);
+
+          return dLat < 0.01 && dLng < 0.01; // filtre GPS
+        })
+    );
+  };
+
+  const path = selectedRace || [];
+  const pathLength = path.length;
+
+  // 🔥 BEARING
   const getBearing = (lat1, lon1, lat2, lon2) => {
     const toRad = (deg) => deg * Math.PI / 180;
     const toDeg = (rad) => rad * 180 / Math.PI;
@@ -31,191 +60,176 @@ const RaceDetailScreen = () => {
     return (toDeg(Math.atan2(y, x)) + 360) % 360;
   };
 
-  const formatTime = (index, total) => {
-    if (!selectedRace || total === 0) return "0:00";
-
-    const percent = index / total;
-    const totalDuration = selectedRace.duration || 0;
-
-    const currentTime = Math.floor(totalDuration * percent);
-
-    const min = Math.floor(currentTime / 60);
-    const sec = currentTime % 60;
-
-    return `${min}:${sec.toString().padStart(2, '0')}`;
-  };
-
-  const leafletHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-        <style>
-          body { margin: 0; }
-          #map { height: 100vh; width: 100vw; }
-
-          .marker-inner {
-            width: 0;
-            height: 0;
-
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 20px solid #f95c5c;
-
-            transform-origin: 50% 70%;
-
-            filter: drop-shadow(0 0 3px white) drop-shadow(0 2px 3px rgba(0,0,0,0.3));
-          }
-        
-          .marker-inner::after {
-            content: '';
-            position: absolute;
-            left: -4px;
-            top: 12px;
-            width: 8px;
-            height: 8px;
-            background: white;
-            border-radius: 50%;
-          }
-        </style>
-      </head>
-      <body>
-        <div id="map"></div>
-
-        <script>
-          var map = L.map('map').setView([48.39, -4.48], 15);
-
-          L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap France'
-          }).addTo(map);
-
-          var replayLine = L.polyline([], {
-            color: '#4266f5',
-            weight: 5
-          }).addTo(map);
-
-          var fullLine = L.polyline([], {
-            color: '#ccc',
-            weight: 3,
-            opacity: 0.5
-          }).addTo(map);
-
-          var marker = null;
-
-          function handleMessage(event) {
-            var data = JSON.parse(event.data);
-
-            if (data.fullPath) {
-              var latlngs = data.fullPath.map(p => [p.latitude, p.longitude]);
-              fullLine.setLatLngs(latlngs);
-              map.fitBounds(latlngs);
-            }
-
-            if (data.resetReplay) {
-              replayLine.setLatLngs([]);
-            }
-
-            if (data.replayPoint) {
-              var point = [data.replayPoint.latitude, data.replayPoint.longitude];
-
-              replayLine.addLatLng(point);
-
-              if (!marker) {
-                marker = L.marker(point, {
-                  icon: L.divIcon({
-                    className: '',
-                    html: '<div class="marker-inner"></div>'
-                  })
-                }).addTo(map);
-              } else {
-                marker.setLatLng(point);
-
-                var el = marker.getElement();
-                if (el) {
-                  var inner = el.querySelector('.marker-inner');
-                  if (inner) {
-                    inner.style.transform = 'rotate(' + (data.bearing || 0) + 'deg)';
-                  }
-                }
-              }
-
-              var zoom = 17;
-
-              map.setView(point, zoom);
-            }
-          }
-
-          document.addEventListener("message", handleMessage);
-          window.addEventListener("message", handleMessage);
-        </script>
-      </body>
-    </html>
-  `;
-
+  // 🔥 LOAD DATA
   useEffect(() => {
     const load = async () => {
-      const data = await getRaces();
-      setRaces(data);
+      await dummyPositions(1);
+
+      const data = await getRaceParticipantPositionsByParticipantId(1);
+
+      console.log("POINTS:", data.length);
+
+      const grouped = groupByRace(data);
+
+      setRaces(grouped);
     };
+
     load();
   }, []);
 
-  // ▶️ Replay loop
+  // ▶️ REPLAY LOOP
   useEffect(() => {
     let interval;
 
     if (isPlaying && selectedRace) {
-      const path = JSON.parse(selectedRace.route_data);
-
       interval = setInterval(() => {
-        setReplayIndex((i) => {
+        setReplayIndex(i => {
           if (i >= path.length - 1) {
             setIsPlaying(false);
             return i;
           }
           return i + 1;
         });
-      }, 400);
+      }, 300);
     }
 
     return () => clearInterval(interval);
   }, [isPlaying, selectedRace]);
 
-  // 📡 envoyer path complet
+  // 📡 SEND TO MAP
   useEffect(() => {
     if (!selectedRace || !webviewRef.current) return;
 
-    const path = JSON.parse(selectedRace.route_data);
     const point = path[replayIndex];
 
-    let bearing = 0;
+    let bearing = lastBearing.current;
 
     if (replayIndex > 0) {
       const prev = path[replayIndex - 1];
 
-      let rawBearing = getBearing(
-        prev.latitude,
-        prev.longitude,
-        point.latitude,
-        point.longitude
+      const raw = getBearing(
+        prev.rpp_viewport_latitude,
+        prev.rpp_viewport_longitude,
+        point.rpp_viewport_latitude,
+        point.rpp_viewport_longitude
       );
 
-      // 🔥 lissage
-      let bearing = smooth(lastBearing.current, rawBearing);
-
-      // sauvegarde
+      bearing = smooth(lastBearing.current, raw);
       lastBearing.current = bearing;
     }
 
+    const currentPath = path.slice(0, replayIndex + 1);
+
     webviewRef.current.postMessage(JSON.stringify({
+      currentPath,
       replayPoint: point,
       bearing
     }));
 
   }, [replayIndex]);
 
+  // 📡 FULL PATH INIT
+  useEffect(() => {
+    if (!selectedRace || !webviewRef.current) return;
+
+    webviewRef.current.postMessage(JSON.stringify({
+      fullPath: path
+    }));
+
+  }, [selectedRace]);
+
+  // 🌍 LEAFLET
+  const leafletHtml = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <style>
+      body { margin: 0; }
+      #map { height: 100vh; width: 100vw; }
+
+      .marker-inner {
+        width: 0;
+        height: 0;
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        border-bottom: 20px solid #ff3b3b;
+        transform-origin: 50% 70%;
+        filter: drop-shadow(0 0 3px white);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script>
+      var map = L.map('map').setView([48.39, -4.48], 15);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png').addTo(map);
+
+      var replayLine = L.polyline([], { color: '#4266f5', weight: 5 }).addTo(map);
+      var fullLine = L.polyline([], { color: '#ccc', weight: 3 }).addTo(map);
+
+      var marker = null;
+
+      function handleMessage(event) {
+        var data = JSON.parse(event.data);
+
+        if (data.fullPath) {
+          var latlngs = data.fullPath.map(p => [
+            p.rpp_viewport_latitude,
+            p.rpp_viewport_longitude
+          ]);
+          fullLine.setLatLngs(latlngs);
+          map.fitBounds(latlngs);
+        }
+
+        if (data.currentPath) {
+          var latlngs = data.currentPath.map(p => [
+            p.rpp_viewport_latitude,
+            p.rpp_viewport_longitude
+          ]);
+          replayLine.setLatLngs(latlngs);
+        }
+
+        if (data.replayPoint) {
+          var point = [
+            data.replayPoint.rpp_viewport_latitude,
+            data.replayPoint.rpp_viewport_longitude
+          ];
+
+          if (!marker) {
+            marker = L.marker(point, {
+              icon: L.divIcon({
+                html: '<div class="marker-inner"></div>'
+              })
+            }).addTo(map);
+          } else {
+            marker.setLatLng(point);
+
+            var el = marker.getElement();
+            if (el) {
+              var inner = el.querySelector('.marker-inner');
+              if (inner) {
+                inner.style.transform = 'rotate(' + (data.bearing || 0) + 'deg)';
+              }
+            }
+          }
+
+          map.setView(point, 17);
+        }
+      }
+
+      document.addEventListener("message", handleMessage);
+      window.addEventListener("message", handleMessage);
+    </script>
+  </body>
+  </html>
+  `;
+
+  // 📱 LIST VIEW
   if (!selectedRace) {
     return (
       <View style={styles.container}>
@@ -223,7 +237,7 @@ const RaceDetailScreen = () => {
 
         <FlatList
           data={races}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => index.toString()}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
@@ -232,9 +246,8 @@ const RaceDetailScreen = () => {
                 setReplayIndex(0);
               }}
             >
-              <Text style={styles.cardTitle}>{item.name}</Text>
-              <Text>{item.distance} km</Text>
-              <Text>{item.duration}s</Text>
+              <Text style={styles.cardTitle}>Course</Text>
+              <Text>{item.length} points</Text>
             </TouchableOpacity>
           )}
         />
@@ -242,6 +255,7 @@ const RaceDetailScreen = () => {
     );
   }
 
+  // 🎬 REPLAY VIEW
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => {
@@ -270,36 +284,21 @@ const RaceDetailScreen = () => {
         <TouchableOpacity onPress={() => {
           setIsPlaying(false);
           setReplayIndex(0);
-
-          webviewRef.current.postMessage(JSON.stringify({
-            resetReplay: true
-          }));
         }}>
           <Text style={styles.control}>⏹</Text>
         </TouchableOpacity>
       </View>
-      <View style={styles.timelineContainer}>
-        <Slider
-          style={{ width: "100%", height: 40 }}
-          minimumValue={0}
-          maximumValue={pathLength > 0 ? pathLength - 1 : 0}
-          value={replayIndex}
-          onSlidingStart={() => setIsPlaying(false)}
-          onValueChange={(value) => {
-            setIsPlaying(false); // pause quand on touche
-            setReplayIndex(Math.floor(value));
-          }}
 
-          minimumTrackTintColor="#4266f5"
-          maximumTrackTintColor="#ccc"
-          thumbTintColor="#4266f5"
-        />
-
-        <View style={styles.timelineLabels}>
-          <Text>{formatTime(replayIndex, pathLength)}</Text>
-          <Text>{formatTime(pathLength, pathLength)}</Text>
-        </View>
-      </View>
+      <Slider
+        style={{ width: "100%", height: 40 }}
+        minimumValue={0}
+        maximumValue={pathLength > 0 ? pathLength - 1 : 0}
+        value={replayIndex}
+        onValueChange={(v) => {
+          setIsPlaying(false);
+          setReplayIndex(Math.floor(v));
+        }}
+      />
     </View>
   );
 };
@@ -326,17 +325,6 @@ const styles = StyleSheet.create({
   control: { fontSize: 30 },
 
   back: { fontSize: 18, marginBottom: 10 },
-  timelineContainer: {
-    width: "100%",
-    marginTop: 10,
-    paddingHorizontal: 10,
-  },
-
-  timelineLabels: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: -5,
-  },
 });
 
 export default RaceDetailScreen;

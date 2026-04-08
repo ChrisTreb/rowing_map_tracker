@@ -7,6 +7,15 @@ export const initDb = async () => {
     db = await SQLite.openDatabaseAsync("rowing_tracker.db");
 
     await db.execAsync(`
+      DROP TABLE IF EXISTS race_participant_position;
+      DROP TABLE IF EXISTS race_participant;
+      DROP TABLE IF EXISTS race;
+      DROP TABLE IF EXISTS race_event_track;
+      DROP TABLE IF EXISTS race_event;
+      DROP TABLE IF EXISTS session;
+      DROP TABLE IF EXISTS user;
+      DROP TABLE IF EXISTS rowing_club;
+
       CREATE TABLE IF NOT EXISTS race (
         ra_id INTEGER PRIMARY KEY AUTOINCREMENT,
         ra_re_id INTEGER NOT NULL REFERENCES race_event(re_id) ON DELETE CASCADE,
@@ -128,11 +137,11 @@ export const getRaces = async () => {
   }
 };
 
-export const getRaceById = async (id) => {
+export const getRaceById = async (ra_id) => {
   try {
-    const result = await db.getAsync(
-      `SELECT * FROM  races WHERE id = ?`,
-      [id]
+    const result = await db.getFirstAsync(
+      `SELECT * FROM  races WHERE ra_id = ?`,
+      [ra_id]
     );
     return result;
   } catch (error) {
@@ -184,11 +193,11 @@ export const getRaceEvents = async () => {
   }
 };
 
-export const getRaceEventById = async (id) => {
+export const getRaceEventById = async (re_id) => {
   try {
-    const result = await db.getAsync(
-      `SELECT * FROM race_event WHERE id = ?`,
-      [id]
+    const result = await db.getFirstAsync(
+      `SELECT * FROM race_event WHERE re_id = ?`,
+      [re_id]
     );
     return result;
   } catch (error) {
@@ -198,7 +207,6 @@ export const getRaceEventById = async (id) => {
 };
 
 export const updateRaceEvent = async (
-  id,
   re_eventName,
   re_eventVisibility,
   re_eventStartDateAndTime,
@@ -254,11 +262,11 @@ export const getRaceEventTracksByRaceEventId = async (re_id) => {
   }
 };
 
-export const getRaceEventTrackById = async (id) => {
+export const getRaceEventTrackById = async (ret_id) => {
   try {
-    const result = await db.getAsync(
-      `SELECT * FROM race_event_track WHERE id = ?`,
-      [id]
+    const result = await db.getFirstAsync(
+      `SELECT * FROM race_event_track WHERE ret_id = ?`,
+      [ret_id]
     );
     return result;
   } catch (error) {
@@ -267,11 +275,11 @@ export const getRaceEventTrackById = async (id) => {
   }
 };
 
-export const updateRaceEventTrack = async (id, ret_track_data) => {
+export const updateRaceEventTrack = async (ret_id, ret_track_data) => {
   try {
     await db.runAsync(
-      `UPDATE race_event_track SET ret_track_data = ? WHERE id = ?`,
-      [ret_track_data, id]
+      `UPDATE race_event_track SET ret_track_data = ? WHERE ret_id = ?`,
+      [ret_track_data, ret_id]
     );
   } catch (error) {
     console.error("Error updating race event track:", error);
@@ -281,12 +289,16 @@ export const updateRaceEventTrack = async (id, ret_track_data) => {
 
 // User operations
 export const addUser = async (
-  usr_google_id
+  usr_google_id,
+  usr_email,
+  usr_name,
+  usr_apikey,
+  usr_rc_id
 ) => {
   try {
     const result = await db.runAsync(
-      `INSERT INTO users (usr_google_id) VALUES (?)`,
-      [usr_google_id]
+      `INSERT INTO user (usr_google_id, usr_email, usr_name, usr_apikey, usr_rc_id) VALUES (?, ?, ?, ?, ?)`,
+      [usr_google_id, usr_email, usr_name, usr_apikey, usr_rc_id]
     );
     return result.lastInsertRowId;
   } catch (error) {
@@ -297,8 +309,8 @@ export const addUser = async (
 
 export const getUserByGoogleId = async (usr_google_id) => {
   try {
-    const result = await db.getAsync(   
-      `SELECT * FROM users WHERE usr_google_id = ?`,
+    const result = await db.getFirstAsync(
+      `SELECT * FROM user WHERE usr_google_id = ?`,
       [usr_google_id]
     );
     return result;
@@ -310,8 +322,8 @@ export const getUserByGoogleId = async (usr_google_id) => {
 
 export const getUserById = async (usr_id) => {
   try {
-    const result = await db.getAsync(
-      `SELECT * FROM users WHERE id = ?`,
+    const result = await db.getFirstAsync(
+      `SELECT * FROM user WHERE usr_id = ?`,
       [usr_id]
     );
     return result;
@@ -324,7 +336,7 @@ export const getUserById = async (usr_id) => {
 export const updateUser = async (usr_id, usr_email, usr_name, usr_apikey, usr_rc_id) => {
   try {
     await db.runAsync(
-      `UPDATE users SET usr_email = ?, usr_name = ?, usr_apikey = ?, usr_rc_id = ? WHERE id = ?`,
+      `UPDATE user SET usr_email = ?, usr_name = ?, usr_apikey = ?, usr_rc_id = ? WHERE id = ?`,
       [usr_email, usr_name, usr_apikey, usr_rc_id, usr_id]
     );
   } catch (error) {
@@ -336,7 +348,7 @@ export const updateUser = async (usr_id, usr_email, usr_name, usr_apikey, usr_rc
 export const deleteUser = async (usr_id) => {
   try {
     await db.runAsync(
-      `DELETE FROM users WHERE id = ?`,
+      `DELETE FROM user WHERE id = ?`,
       [usr_id]
     );
   } catch (error) {
@@ -349,7 +361,7 @@ export const deleteUser = async (usr_id) => {
 export const addSession = async (se_user_id, se_expires_at) => {
   try {
     const result = await db.runAsync(
-      `INSERT INTO sessions (se_user_id, se_expires_at) VALUES (?, ?)`,
+      `INSERT INTO session (se_user_id, se_expires_at) VALUES (?, ?)`,
       [se_user_id, se_expires_at]
     );
     return result.lastInsertRowId;
@@ -361,8 +373,8 @@ export const addSession = async (se_user_id, se_expires_at) => {
 
 export const getSessionById = async (se_id) => {
   try {
-    const result = await db.getAsync(
-      `SELECT * FROM sessions WHERE id = ?`,
+    const result = await db.getFirstAsync(
+      `SELECT * FROM session WHERE se_id = ?`,
       [se_id]
     );
     return result;
@@ -375,7 +387,7 @@ export const getSessionById = async (se_id) => {
 export const deleteSession = async (se_id) => {
   try {
     await db.runAsync(
-      `DELETE FROM sessions WHERE id = ?`,
+      `DELETE FROM session WHERE se_id = ?`,
       [se_id]
     );
   } catch (error) {
@@ -395,7 +407,7 @@ export const addRaceParticipant = async (
 ) => {
   try {
     const result = await db.runAsync(
-      `INSERT INTO race_participants (rp_ra_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO race_participant (rp_ra_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
       [rp_ra_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at]
     );
     return result.lastInsertRowId;
@@ -408,7 +420,7 @@ export const addRaceParticipant = async (
 export const getRaceParticipantsByRaceId = async (ra_id) => {
   try {
     const result = await db.getAllAsync(
-      `SELECT * FROM race_participants WHERE rp_ra_id = ?`,
+      `SELECT * FROM race_participant WHERE rp_ra_id = ?`,
       [ra_id]
     );
     return result;
@@ -420,8 +432,8 @@ export const getRaceParticipantsByRaceId = async (ra_id) => {
 
 export const getRaceParticipantById = async (rp_id) => {
   try {
-    const result = await db.getAsync(
-      `SELECT * FROM race_participants WHERE id = ?`,
+    const result = await db.getFirstAsync(
+      `SELECT * FROM race_participant WHERE rp_id = ?`,
       [rp_id]
     );
     return result;
@@ -434,7 +446,7 @@ export const getRaceParticipantById = async (rp_id) => {
 export const updateRaceParticipant = async (rp_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at) => {
   try {
     await db.runAsync(
-      `UPDATE race_participants SET rp_bib = ?, rp_name = ?, rp_color = ?, rp_key = ?, rp_updated_at = ? WHERE id = ?`,
+      `UPDATE race_participant SET rp_bib = ?, rp_name = ?, rp_color = ?, rp_key = ?, rp_updated_at = ? WHERE rp_id = ?`,
       [rp_bib, rp_name, rp_color, rp_key, rp_updated_at, rp_id]
     );
   } catch (error) {
@@ -446,7 +458,7 @@ export const updateRaceParticipant = async (rp_id, rp_bib, rp_name, rp_color, rp
 export const deleteRaceParticipant = async (rp_id) => {
   try {
     await db.runAsync(
-      `DELETE FROM race_participants WHERE id = ?`,
+      `DELETE FROM race_participant WHERE id = ?`,
       [rp_id]
     );
   } catch (error) {
@@ -459,7 +471,7 @@ export const deleteRaceParticipant = async (rp_id) => {
 export const addRowingClub = async (rc_name, rc_nickname) => {
   try {
     const result = await db.runAsync(
-      `INSERT INTO rowing_clubs (rc_name, rc_nickname) VALUES (?, ?)`,
+      `INSERT INTO rowing_club (rc_name, rc_nickname) VALUES (?, ?)`,
       [rc_name, rc_nickname]
     );
     return result.lastInsertRowId;
@@ -471,7 +483,7 @@ export const addRowingClub = async (rc_name, rc_nickname) => {
 
 export const getRowingClubs = async () => {
   try {
-    const result = await db.getAllAsync(`SELECT * FROM rowing_clubs`);
+    const result = await db.getAllAsync(`SELECT * FROM rowing_club`);
     return result;
   } catch (error) {
     console.error("Error fetching rowing clubs:", error);
@@ -481,8 +493,8 @@ export const getRowingClubs = async () => {
 
 export const getRowingClubById = async (rc_id) => {
   try {
-    const result = await db.getAsync(
-      `SELECT * FROM rowing_clubs WHERE id = ?`,
+    const result = await db.getFirstAsync(
+      `SELECT * FROM rowing_club WHERE rc_id = ?`,
       [rc_id]
     );
     return result;
@@ -495,7 +507,7 @@ export const getRowingClubById = async (rc_id) => {
 export const updateRowingClub = async (rc_id, rc_name, rc_nickname) => {
   try {
     await db.runAsync(
-      `UPDATE rowing_clubs SET rc_name = ?, rc_nickname = ? WHERE id = ?`,
+      `UPDATE rowing_club SET rc_name = ?, rc_nickname = ? WHERE rc_id = ?`,
       [rc_name, rc_nickname, rc_id]
     );
   } catch (error) {
@@ -507,7 +519,7 @@ export const updateRowingClub = async (rc_id, rc_name, rc_nickname) => {
 export const deleteRowingClub = async (rc_id) => {
   try {
     await db.runAsync(
-      `DELETE FROM rowing_clubs WHERE id = ?`,
+      `DELETE FROM rowing_club WHERE id = ?`,
       [rc_id]
     );
   } catch (error) {
@@ -526,7 +538,7 @@ export const addRaceParticipantPosition = async (
 ) => {
   try {
     const result = await db.runAsync(
-      `INSERT INTO race_participant_positions (rpp_rp_id, rpp_position, rp_date, rpp_viewport_latitude, rpp_viewport_longitude) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO race_participant_position (rpp_rp_id, rpp_position, rp_date, rpp_viewport_latitude, rpp_viewport_longitude) VALUES (?, ?, ?, ?, ?)`,
       [rpp_rp_id, rpp_position, rp_date, rpp_viewport_latitude, rpp_viewport_longitude]
     );
     return result.lastInsertRowId;
@@ -539,7 +551,7 @@ export const addRaceParticipantPosition = async (
 export const getRaceParticipantPositionsByParticipantId = async (rp_id) => {
   try {
     const result = await db.getAllAsync(
-      `SELECT * FROM race_participant_positions WHERE rpp_rp_id = ?`,
+      `SELECT * FROM race_participant_position WHERE rpp_rp_id = ? ORDER BY rp_date ASC`,
       [rp_id]
     );
     return result;
@@ -552,7 +564,7 @@ export const getRaceParticipantPositionsByParticipantId = async (rp_id) => {
 export const deleteRaceParticipantPositionsByParticipantId = async (rp_id) => {
   try {
     await db.runAsync(
-      `DELETE FROM race_participant_positions WHERE rpp_rp_id = ?`,
+      `DELETE FROM race_participant_position WHERE rpp_rp_id = ?`,
       [rp_id]
     );
   } catch (error) {
@@ -564,10 +576,105 @@ export const deleteRaceParticipantPositionsByParticipantId = async (rp_id) => {
 // Utility function to reset the database (for testing purposes)
 export const resetDatabase = async () => {
   try {
-    await db.execAsync(`DELETE FROM races; `);
+    await db.runAsync(`DELETE FROM races; `);
     console.log("Database reset ✅");
   } catch (error) {
     console.error("Error resetting database:", error);
+    throw error;
+  }
+};
+
+// Generate demo data (for testing purposes)
+export const dummyRaceParticipant = async () => {
+  try {
+    const result = await db.runAsync(
+      `INSERT INTO race_participant (rp_ra_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      [1, "123", "John Doe", "#008cff", "unique_key_123", Date.now()]
+    );
+    console.log("Dummy race participant added:", result.lastInsertRowId);
+    return result.lastInsertRowId;
+  } catch (error) {
+    console.error("Error adding dummy race participant:", error);
+    throw error;
+  }
+};
+
+export const dummyUser = async () => {
+  try {
+    const result = await db.runAsync(
+      `INSERT INTO user (usr_google_id, usr_email, usr_name, usr_apikey, usr_rc_id) VALUES (?, ?, ?, ?, ?)`,
+      ["google_id_123", "john.doe@example.com", "John Doe", "api_key_123", 1]
+    );
+    console.log("Dummy user added:", result.lastInsertRowId);
+    return result.lastInsertRowId;
+  } catch (error) {
+    console.error("Error adding dummy user:", error);
+    throw error;
+  }
+};
+
+export const dummyRaceEvent = async () => {
+  try {
+    const result = await db.runAsync(
+      `INSERT INTO race_event (re_user_id, re_eventName, re_eventVisibility, re_eventStartDateAndTime, re_eventEndDateAndTime, re_eventRandomId_edit, re_eventRandomId_viewer, re_viewport_latitude, re_viewport_longitude, re_viewport_zoom, re_maplayer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [1, "Demo Race Event", 1, Date.now(), Date.now() + 3600000, "edit_random_id_123", "viewer_random_id_123", 48.400002, -4.48333, 17, "OpenStreetMap"]
+    );
+    console.log("Dummy race event added:", result.lastInsertRowId);
+    return result.lastInsertRowId;
+  } catch (error) {
+    console.error("Error adding dummy race event:", error);
+    throw error;
+  }
+};
+
+export const dummyRowingClub = async () => {
+  try {
+    const result = await db.runAsync(
+      `INSERT INTO rowing_club (rc_name, rc_nickname) VALUES (?, ?)`,
+      ["Aviron Brestois", "AVB"]
+    );
+    console.log("Dummy rowing club added:", result.lastInsertRowId);
+    return result.lastInsertRowId;
+  } catch (error) {
+    console.error("Error adding dummy rowing club:", error);
+    throw error;
+  }
+};
+
+export const dummyPositions = async (participantId) => {
+  try {
+    const now = Date.now();
+
+    const positions = [
+      [participantId, now - 60000, 48.3825, -4.4850],
+      [participantId, now - 55000, 48.3828, -4.4845],
+      [participantId, now - 50000, 48.3832, -4.4840],
+      [participantId, now - 45000, 48.3836, -4.4835],
+      [participantId, now - 40000, 48.3840, -4.4830],
+      [participantId, now - 35000, 48.3845, -4.4825],
+      [participantId, now - 30000, 48.3850, -4.4820],
+      [participantId, now - 25000, 48.3855, -4.4815],
+      [participantId, now - 20000, 48.3860, -4.4810],
+      [participantId, now - 15000, 48.3865, -4.4805],
+      [participantId, now - 10000, 48.3870, -4.4800],
+      [participantId, now - 5000, 48.3875, -4.4795],
+      [participantId, now, 48.3880, -4.4790],
+    ];
+
+    for (const pos of positions) {
+      await db.runAsync(
+        `INSERT INTO race_participant_position 
+        (rpp_rp_id, rp_date, rpp_viewport_latitude, rpp_viewport_longitude)
+        VALUES (?, ?, ?, ?)`,
+        pos
+      );
+    }
+
+    console.log("Dummy positions added:", positions.length);
+    return positions.length;
+
+  } catch (error) {
+    console.error("Error adding dummy positions:", error);
     throw error;
   }
 };
