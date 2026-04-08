@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
-    Alert
+    View
 } from "react-native";
-import { getRaces, resetDatabase, seedRaces } from "../../../services/database";
+import { getRaces, resetDatabase } from "../../../services/database";
 
 const RaceListScreen = () => {
     const [races, setRaces] = useState([]);
@@ -39,7 +39,6 @@ const RaceListScreen = () => {
                         try {
                             setLoading(true);
                             await resetDatabase();
-                            await seedRaces();
                             await loadRaces(); // 🔥 refresh automatique
                         } catch (e) {
                             console.error(e);

@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
-import { addRace, initDb, seedRaces } from "../../../services/database";
+import { addRace, initDb } from "../../../services/database";
 
 // CONFIG
 const MIN_DISTANCE = 0.005;
@@ -154,7 +154,6 @@ const HomeScreen = () => {
     const init = async () => {
       try {
         await initDb();
-        await seedRaces();
 
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
