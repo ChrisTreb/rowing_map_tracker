@@ -3,14 +3,22 @@ import * as Location from 'expo-location';
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
-import { addRace, initDb, seedRaces } from "../../../services/database";
+import {
+  addRaceParticipantPosition,
+  dummyRaceEvent,
+  dummyRaceParticipant,
+  dummyRowingClub,
+  dummyUser,
+  initDb
+} from "../../../services/database";
 
 // CONFIG
 const MIN_DISTANCE = 0.005;
-const MIN_SPEED_DISTANCE = 0.01; // 10 mètres
-const MIN_TIME = 1; // secondes
+const MIN_SPEED_DISTANCE = 0.01;
+const MIN_TIME = 1;
 const MAX_SPEED = 200;
 const MAX_ACCURACY = 10;
+
 const INIT_LOCATION = { latitude: 48.39, longitude: -4.48 };
 
 const HomeScreen = () => {
@@ -21,15 +29,15 @@ const HomeScreen = () => {
   const [path, setPath] = useState([]);
   const [bearing, setBearing] = useState(0);
   const [currentSpeed, setCurrentSpeed] = useState(0);
-  const lastTimestamp = useRef(null);
 
-  let raceName = "Course du " + new Date().toLocaleString();
+  const lastTimestamp = useRef(null);
+  const lastBearing = useRef(0);
 
   const webviewRef = useRef(null);
   const locationSubscription = useRef(null);
   const timerRef = useRef(null);
 
-  // 🔥 CALCUL DIRECTION
+  // 🔥 BEARING
   const getBearing = (lat1, lon1, lat2, lon2) => {
     const toRad = (deg) => deg * Math.PI / 180;
     const toDeg = (rad) => rad * 180 / Math.PI;
@@ -46,133 +54,98 @@ const HomeScreen = () => {
     return (toDeg(Math.atan2(y, x)) + 360) % 360;
   };
 
+  // 🌍 MAP
   const leafletHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-        <style>
-          body { margin: 0; }
-          #map { height: 100vh; width: 100vw; }
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <style>
+      body { margin: 0; }
+      #map { height: 100vh; }
 
-          .custom-marker {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
+      .marker-inner {
+        width: 0;
+        height: 0;
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        border-bottom: 20px solid #4266f5;
+        transform-origin: 50% 70%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
 
-          .marker-inner {
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 20px solid #4266f5;
-            transform-origin: center;
-          }
-          .marker-inner::after {
-            content: '';
-            position: absolute;
-            left: -4px;
-            top: 12px;
-            width: 8px;
-            height: 8px;
-            background: white;
-            border-radius: 50%;
-          }
-        </style>
-      </head>
-      <body>
-        <div id="map"></div>
+    <script>
+      var map = L.map('map').setView([48.39, -4.48], 15);
 
-        <script>
-          var map = L.map('map').setView([48.39, -4.48], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png').addTo(map);
 
-          L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap France'
+      var polyline = L.polyline([], { color: '#4266f5', weight: 5 }).addTo(map);
+      var marker = null;
+
+      function handleMessage(event) {
+        var data = JSON.parse(event.data);
+        var point = [data.lat, data.lng];
+
+        // marker
+        if (!marker) {
+          marker = L.marker(point, {
+            icon: L.divIcon({
+              html: '<div class="marker-inner"></div>'
+            })
           }).addTo(map);
-
-          var polyline = L.polyline([], {color: '#4266f5', weight: 5}).addTo(map);
-          var currentMarker = null;
-          var startMarker = null;
-
-          function handleMessage(event) {
-            try {
-              var data = JSON.parse(event.data);
-              var newPoint = [data.lat, data.lng];
-
-              // ✅ Marker stable
-              if (!currentMarker) {
-                currentMarker = L.marker(newPoint, {
-                  icon: L.divIcon({
-                    className: 'custom-marker',
-                    html: '<div class="marker-inner"></div>'
-                  })
-                }).addTo(map);
-              } else {
-                currentMarker.setLatLng(newPoint);
-              }
-
-              // ✅ rotation propre
-              var el = currentMarker.getElement();
-              if (el) {
-                var inner = el.querySelector('.marker-inner');
-                if (inner) {
-                  inner.style.transform = 'rotate(' + (data.bearing || 0) + 'deg)';
-                }
-              }
-
-              // Path
-              if (data.isTracking) {
-                var latlngs = data.path.map(p => [p.latitude, p.longitude]);
-                polyline.setLatLngs(latlngs);
-
-                if (latlngs.length === 1 && !startMarker) {
-                  startMarker = L.marker(latlngs[0]).addTo(map);
-                }
-              }
-
-              if (data.follow) {
-                var zoom = 17;
-                map.setView(newPoint, zoom);
-              }
-
-            } catch (e) {
-              console.log("ERROR:", e);
-            }
-          }
-
-          document.addEventListener("message", handleMessage);
-          window.addEventListener("message", handleMessage);
-        </script>
-      </body>
-    </html>
-  `;
-
-  useEffect(() => {
-    const init = async () => {
-      try {
-        await initDb();
-        await seedRaces();
-
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert("Permission refusée");
-          return;
+        } else {
+          marker.setLatLng(point);
         }
 
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High
-        });
+        // rotation
+        var el = marker.getElement();
+        if (el) {
+          var inner = el.querySelector('.marker-inner');
+          if (inner) {
+            inner.style.transform = 'rotate(' + (data.bearing || 0) + 'deg)';
+          }
+        }
 
-        const { latitude, longitude } = location.coords;
+        // path
+        if (data.path) {
+          var latlngs = data.path.map(p => [p.latitude, p.longitude]);
+          polyline.setLatLngs(latlngs);
+        }
 
-        setCurrentLocation({ latitude, longitude });
-
-      } catch (e) {
-        console.error(e);
+        if (data.follow) {
+          map.setView(point, 17);
+        }
       }
+
+      document.addEventListener("message", handleMessage);
+      window.addEventListener("message", handleMessage);
+    </script>
+  </body>
+  </html>
+  `;
+
+  // 🔥 INIT
+  useEffect(() => {
+    const init = async () => {
+      await initDb();
+      await dummyRowingClub();
+      await dummyUser();
+      await dummyRaceEvent();
+      await dummyRaceParticipant();
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission refusée");
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      setCurrentLocation(location.coords);
     };
 
     init();
@@ -183,19 +156,18 @@ const HomeScreen = () => {
     };
   }, []);
 
+  // 📡 SEND MAP
   useEffect(() => {
-    if (webviewRef.current) {
-      webviewRef.current.postMessage(JSON.stringify({
-        lat: currentLocation.latitude,
-        lng: currentLocation.longitude,
-        path,
-        isTracking,
-        follow: true,
-        bearing
-      }));
-    }
-  }, [currentLocation, path, isTracking, bearing]);
+    webviewRef.current?.postMessage(JSON.stringify({
+      lat: currentLocation.latitude,
+      lng: currentLocation.longitude,
+      path,
+      bearing,
+      follow: true
+    }));
+  }, [currentLocation, path, bearing]);
 
+  // 🔥 DISTANCE
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
@@ -210,23 +182,17 @@ const HomeScreen = () => {
     return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1000;
   };
 
+  // ▶️ START
   const startTracking = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission refusée");
-      return;
-    }
-
     setDistance(0);
     setTimeElapsed(0);
     setPath([]);
+    setCurrentSpeed(0);
+    lastTimestamp.current = null;
 
-    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setTimeElapsed(t => t + 1);
     }, 1000);
-
-    locationSubscription.current?.remove();
 
     locationSubscription.current = await Location.watchPositionAsync(
       {
@@ -238,8 +204,8 @@ const HomeScreen = () => {
         const { latitude, longitude, accuracy } = location.coords;
         if (accuracy > MAX_ACCURACY) return;
 
+        const now = location.timestamp;
         const newPoint = { latitude, longitude };
-        setCurrentLocation(newPoint);
 
         setPath(prev => {
           if (prev.length === 0) return [newPoint];
@@ -255,22 +221,17 @@ const HomeScreen = () => {
 
           if (d < MIN_DISTANCE) return prev;
 
-          const now = location.timestamp;
-
           let speed = 0;
 
           if (lastTimestamp.current) {
-            const deltaTime = (now - lastTimestamp.current) / 1000; // sec
+            const dt = (now - lastTimestamp.current) / 1000;
 
-            if (deltaTime >= MIN_TIME) {
-
-              // 🔥 ignorer petits mouvements GPS
+            if (dt >= MIN_TIME) {
               if (d < MIN_SPEED_DISTANCE) {
                 speed = 0;
               } else {
-                speed = d / (deltaTime / 3600); // km/h
+                speed = d / (dt / 3600);
               }
-
             }
           }
 
@@ -278,55 +239,44 @@ const HomeScreen = () => {
 
           if (speed > MAX_SPEED) return prev;
 
-          // ✅ vitesse instantanée
-          const smoothSpeed = (oldSpeed, newSpeed) => {
-            return oldSpeed * 0.8 + newSpeed * 0.2;
-          };
+          // 🔥 smoothing
+          setCurrentSpeed(prev => prev * 0.7 + speed * 0.3);
 
-          setCurrentSpeed(prev => smoothSpeed(prev, speed));
+          // 🔥 bearing stable
+          if (speed > 1) {
+            const raw = getBearing(
+              last.latitude,
+              last.longitude,
+              latitude,
+              longitude
+            );
 
-          if (speed < 1) speed = 0;
+            const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
+            lastBearing.current = smoothBearing;
+            setBearing(smoothBearing);
+          }
 
-          // ✅ bearing
-          const newBearing = getBearing(
-            last.latitude,
-            last.longitude,
-            latitude,
-            longitude
-          );
-
-          setBearing(newBearing);
+          // DB insert
+          addRaceParticipantPosition(1, now, latitude, longitude);
 
           setDistance(dist => dist + d);
+
           return [...prev, newPoint];
         });
+
+        setCurrentLocation(newPoint);
       }
     );
 
     setIsTracking(true);
   };
 
-  const stopTracking = async () => {
+  // ⏹ STOP
+  const stopTracking = () => {
     locationSubscription.current?.remove();
-
-    if (timerRef.current) clearInterval(timerRef.current);
+    clearInterval(timerRef.current);
 
     setIsTracking(false);
-
-    if (path.length >= 2) {
-      const duration = timeElapsed;
-      let avgSpeed = duration > 0 ? distance / (duration / 3600) : 0;
-
-      await addRace(
-        raceName,
-        Date.now() - duration * 1000,
-        Date.now(),
-        duration,
-        distance.toFixed(2),
-        avgSpeed.toFixed(2),
-        JSON.stringify(path)
-      );
-    }
   };
 
   return (
@@ -337,8 +287,6 @@ const HomeScreen = () => {
           ref={webviewRef}
           originWhitelist={['*']}
           source={{ html: leafletHtml }}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
           style={styles.map}
         />
       </View>
@@ -354,7 +302,6 @@ const HomeScreen = () => {
       )}
 
       <View style={styles.infos}>
-        {/* Ligne 1 */}
         <View style={styles.row}>
           <View style={styles.card}>
             <Text style={styles.label}>Distance</Text>
@@ -369,7 +316,6 @@ const HomeScreen = () => {
           </View>
         </View>
 
-        {/* Ligne 2 */}
         <View style={styles.row}>
           <View style={styles.card}>
             <Text style={styles.label}>Vitesse actuelle</Text>
@@ -388,13 +334,13 @@ const HomeScreen = () => {
           </View>
         </View>
       </View>
+
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  title: { fontSize: 24, textAlign: "center", marginVertical: 15 },
   mapContainer: { height: 350 },
   map: { flex: 1 },
 
@@ -409,10 +355,8 @@ const styles = StyleSheet.create({
   },
   btnStart: { backgroundColor: "#4266f5" },
   btnStop: { backgroundColor: "#ff895e" },
-  infos: {
-    marginTop: 20,
-    paddingHorizontal: 15,
-  },
+
+  infos: { marginTop: 20, paddingHorizontal: 15 },
 
   row: {
     flexDirection: "row",
@@ -427,35 +371,12 @@ const styles = StyleSheet.create({
     padding: 15,
     marginHorizontal: 5,
     alignItems: "center",
-
-    // shadow iOS
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-
-    // shadow Android
     elevation: 3,
   },
 
-  label: {
-    fontSize: 13,
-    color: "#888",
-    marginBottom: 5,
-  },
-
-  value: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#222",
-  },
-
-  unit: {
-    fontSize: 12,
-    color: "#888",
-    marginTop: 2,
-  },
-
+  label: { fontSize: 13, color: "#888" },
+  value: { fontSize: 24, fontWeight: "bold" },
+  unit: { fontSize: 12, color: "#888" },
 });
 
 export default HomeScreen;

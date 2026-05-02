@@ -1,21 +1,33 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { getUserById } from "../../../services/database";
 
 const UserScreen = () => {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const user = await getUserById(1); // TODO: dynamique
+      setUser(user);
+    };
+
+    fetchUser();
+  }, []);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Profil Utilisateur</Text>
       <View style={styles.infoContainer}>
         <Text style={styles.label}>Nom d'utilisateur:</Text>
-        <Text style={styles.value}>John Doe</Text>
+        <Text style={styles.value}>{user?.usr_name}</Text>
       </View>
       <View style={styles.infoContainer}>
         <Text style={styles.label}>Email:</Text>
-        <Text style={styles.value}>john.doe@example.com</Text>
+        <Text style={styles.value}>{user?.usr_email}</Text>
       </View>
       <View style={styles.infoContainer}>
-        <Text style={styles.label}>Statut:</Text>
-        <Text style={styles.value}>Actif</Text>
+        <Text style={styles.label}>Google ID:</Text>
+        <Text style={styles.value}>{user?.usr_google_id}</Text>
       </View>
       <Text style={styles.placeholderText}>
         (Ici, vous pourrez afficher les statistiques de l'utilisateur, les
