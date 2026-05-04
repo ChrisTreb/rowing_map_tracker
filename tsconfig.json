@@ -15,6 +15,6 @@
     "**/*.jsx", // Inclure les fichiers JSX
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "app/types/**/*.ts" // Inclure explicitement votre dossier de types, si ce n'est pas déjà couvert par "**/*.ts"
+    "types/**/*.ts" // Inclure explicitement votre dossier de types, si ce n'est pas déjà couvert par "**/*.ts"
   ]
 }

@@ -1,9 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "react-native";
 
 // Screens
 import HomeScreen from "./screens/HomeScreen";
+
+// TS interface for icon names
+type IconName = keyof typeof Ionicons.glyphMap;
 
 //Screen names
 const homeName = "Home";
@@ -11,7 +14,6 @@ const homeName = "Home";
 const Tab = createBottomTabNavigator();
 
 function MainContainer() {
-
     return (
         <>
             <StatusBar animated={true} backgroundColor="#1E90FF" />
@@ -33,7 +35,7 @@ function MainContainer() {
                         null,
                     ],
                     tabBarIcon: ({ focused, color, size }) => {
-                        let iconName;
+                        let iconName: IconName = "help-circle"; // fallback
                         let rn = route.name;
 
                         if (rn === homeName) {
@@ -46,7 +48,7 @@ function MainContainer() {
                 })}
             >
                 <Tab.Screen name={homeName} component={HomeScreen} />
-    
+
                 { }
             </Tab.Navigator>
         </> // Utilisez un fragment React pour envelopper la StatusBar et le Tab.Navigator
