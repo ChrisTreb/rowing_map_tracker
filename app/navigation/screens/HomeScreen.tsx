@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { RaceEvent } from "../../../types/RaceEvent";
+import { formatDateTime } from "../../../utils/dateUtils";
 
 const HomeScreen = () => {
   const [events, setEvents] = useState<RaceEvent[]>([]);
@@ -25,11 +26,14 @@ const HomeScreen = () => {
       setEvents(
         data.raceevents.sort(
           (a: RaceEvent, b: RaceEvent) =>
-            b.re_eventStartDateAndTime - a.re_eventStartDateAndTime,
+            b.re_event_end_date_and_time - a.re_event_start_date_and_time,
         ),
       );
 
-      console.log(data);
+      for (const event of data.raceevents) {
+        console.log("Event:", event);
+      }
+
     } catch (error) {
       console.error("Error fetching race events:", error);
     }
@@ -42,13 +46,13 @@ const HomeScreen = () => {
   const renderItem = ({ item }: { item: RaceEvent }) => {
     return (
       <View style={styles.card}>
-        <Text style={styles.title}>{item.re_eventName}</Text>
+        <Text style={styles.title}>{item.re_event_name}</Text>
         <Text style={styles.text}>Participants: {item.nb_participants}</Text>
         <Text style={styles.text}>
-          Début: {new Date(item.re_eventStartDateAndTime).toLocaleString()}
+          Début: {formatDateTime(item.re_event_start_date_and_time)}
         </Text>
         <Text style={styles.text}>
-          Fin: {new Date(item.re_eventEndDateAndTime).toLocaleString()}
+          Fin: {formatDateTime(item.re_event_end_date_and_time)}
         </Text>
       </View>
     );
