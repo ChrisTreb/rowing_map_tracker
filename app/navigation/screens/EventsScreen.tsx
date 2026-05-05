@@ -1,22 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { initDb } from "../../../services/database";
 import { DbRaceEvent, addRaceEvent, getRaceEventById, getRaceEvents, updateRaceEvent } from "../../../services/raceEvent";
 import { RaceEvent } from "../../../types/RaceEvent";
 import { formatDateTime } from "../../../utils/dateUtils";
 
 const EventsScreen = () => {
-  // State to hold the list of race events retrieved from the local database
   const [dbEvents, setDbEvents] = useState<DbRaceEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true); // État pour indiquer le chargement/la synchronisation
 
-  // Get race events from the API and sort them by end date in descending order
-  const getApiRaceEvents = async () => {
+  // Fonction pour récupérer les événements de l'API et les synchroniser avec la DB locale
+  const syncApiRaceEventsToLocalDb = async () => {
     try {
       const apiURL = process.env.EXPO_PUBLIC_API_URL;
       const apiKey = process.env.EXPO_PUBLIC_API_KEY;
-
-      console.log("API URL:", apiURL);
-      console.log("API Key:", apiKey);
 
       const response = await fetch(`${apiURL}/raceevents`, {
         method: "GET",
@@ -27,25 +24,18 @@ const EventsScreen = () => {
       });
       const data = await response.json();
 
-      // Sort events by end date in descending order (most recent first)
-      data.raceevents.sort(
-        (a: RaceEvent, b: RaceEvent) =>
-          b.re_event_end_date_and_time - a.re_event_start_date_and_time
-      )
+      // Préparer toutes les opérations d'insertion/mise à jour en parallèle
+      const syncPromises = data.raceevents.map(async (event: RaceEvent) => {
 
-      // Loop through the sorted events and add them to the local database if they don't already exist
-      for (const event of data.raceevents) {
-        console.log("Event:", event);
-
-        // Validation de re_viewport_visibility (doit être 0 ou 1)
+        // Validation de re_event_visibility (doit être 0 ou 1)
         const visibility = (event.re_event_visibility >= 0 && event.re_event_visibility <= 1) ? event.re_event_visibility : 1;
 
-        // Check if the event already exists in the local database before adding it
-        await getRaceEventById(event.re_id).then((existingEvent) => {
+        try {
+          const existingEvent = await getRaceEventById(event.re_id);
           if (existingEvent) {
-            console.log(`Event with ID ${event.re_id} already exists in the local database. Updating it.`);
-            updateRaceEvent(
-                event.re_user_id,
+            // Mettre à jour l'événement existant
+            await updateRaceEvent(
+                event.re_id,
                 event.re_event_name,
                 visibility,
                 event.re_event_start_date_and_time,
@@ -62,10 +52,10 @@ const EventsScreen = () => {
                 event.re_flag_content,
                 event.nb_participants
             );
+            console.log(`Event with ID ${event.re_id} updated.`);
           } else {
-            console.log(`Event with ID ${event.re_id} does not exist in the local database. Adding it now.`);
-            try {
-              addRaceEvent(
+            // Ajouter le nouvel événement
+            await addRaceEvent(
                 event.re_id,
                 event.re_user_id,
                 event.re_event_name,
@@ -83,46 +73,72 @@ const EventsScreen = () => {
                 event.re_tail_timeout,
                 event.re_flag_content,
                 event.nb_participants
-              );
-            } catch (error) {
-              console.error("Error adding race event to local database:", error);
-            }
+            );
+            console.log(`Event with ID ${event.re_id} added.`);
           }
-        }).catch((error) => {
-          console.error(`Error checking for event with ID ${event.re_id} in local database:`, error);
-        });
-      }
     } catch (error) {
-      console.error("Error fetching race events:", error);
+          console.error(`Error syncing event ${event.re_id} to local database:`, error);
+          throw error; // Propager l'erreur pour que Promise.allSettled la capture
+    }
+      });
+
+      // Exécuter toutes les promesses de synchronisation en parallèle
+      const results = await Promise.allSettled(syncPromises);
+
+      // Log des résultats pour le débogage
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`Synchronisation de l'événement ${data.raceevents[index]?.re_id} échouée:`, result.reason);
+        }
+      });
+
+      console.log("Synchronisation des événements terminée.");
+
+    } catch (error) {
+      console.error("Error fetching or syncing race events:", error);
     }
   };
 
-  // Function to handle button press to enter participant code
-  const onPressFunction = () => {
-    console.log("Button pressed!");
+  // Fonction pour récupérer les événements de la base de données locale
+  const loadLocalRaceEvents = async () => {
+    try {
+      const eventsFromDb = await getRaceEvents();
+      // Trier les événements par date de fin descendante
+      eventsFromDb.sort(
+        (a: DbRaceEvent, b: DbRaceEvent) =>
+          b.re_event_end_date_and_time - a.re_event_start_date_and_time
+    );
+      setDbEvents(eventsFromDb);
+    } catch (error) {
+      console.error("Error retrieving race events from local database:", error);
+    }
   };
 
+  // Initialisation de la base de données et synchronisation des événements
   useEffect(() => {
-    // Initialize the database when the app starts
-    initDb().then(() => {
-        console.log("Database initialized successfully");
-        // Fetch race events from the API and store them in the local database
-        getApiRaceEvents().then(() => {
-          console.log("Race events fetched and stored successfully");
-          getRaceEvents().then((dbEvents) => {
-            setDbEvents(dbEvents);
-            console.log("Race events retrieved from local database:", dbEvents);
-          }).catch((error) => {
-            console.error("Error retrieving race events from local database:", error);
-          });
-        }).catch((error) => {
-          console.error("Error fetching race events from API:", error);
-        });
-    }).catch((error) => {
-        console.error("Error initializing database:", error);
-    });
-    
-  }, []);
+    const initializeAndSync = async () => {
+      try {
+        setIsLoading(true);
+        await initDb();
+        console.log("Database initialized successfully.");
+        await syncApiRaceEventsToLocalDb();
+        console.log("API events synced to local database.");
+        await loadLocalRaceEvents();
+        console.log("Local events loaded into state.");
+      } catch (error) {
+        console.error("Initialization or sync failed:", error);
+      } finally {
+        setIsLoading(false);
+      }
+};
+
+    initializeAndSync();
+  }, []); // Exécuter une seule fois au montage du composant
+
+  const onPressFunction = () => {
+    console.log("Button pressed!");
+    // Logique pour entrer un code participant
+  };
 
   const renderItem = ({ item }: { item: DbRaceEvent }) => {
     return (
@@ -138,6 +154,15 @@ const EventsScreen = () => {
       </View>
     );
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+        <Text style={styles.loadingText}>Synchronisation des événements...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -191,6 +216,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#555',
+  },
 });
 
 export default EventsScreen;
+

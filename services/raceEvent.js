@@ -14,7 +14,7 @@ import { getDb } from './database';
  * @property {number} re_viewport_latitude
  * @property {number} re_viewport_longitude
  * @property {number} re_viewport_zoom
- * @property {string} re_viewport_opacity
+ * @property {number} re_viewport_opacity
  * @property {string} re_maplayer
  * @property {number} re_marker_timeout
  * @property {number} re_tail_timeout
@@ -35,7 +35,7 @@ import { getDb } from './database';
  * @param {number} re_viewport_latitude La latitude du centre de la carte.
  * @param {number} re_viewport_longitude La longitude du centre de la carte.
  * @param {number} re_viewport_zoom Le niveau de zoom de la carte.
- * @param {string} re_viewport_opacity L'opacité du viewport.
+ * @param {number} re_viewport_opacity L'opacité du viewport.
  * @param {string} re_maplayer Le type de couche de carte.
  * @param {number} re_marker_timeout Le délai d'expiration des marqueurs en secondes (optionnel, par défaut 180).
  * @param {number} re_tail_timeout Le délai d'expiration des traces en secondes (optionnel, par défaut 180).
@@ -128,7 +128,7 @@ export const getRaceEventById = async (re_id) => {
  * @param {number} re_viewport_latitude La nouvelle latitude du centre de la carte.
  * @param {number} re_viewport_longitude La nouvelle longitude du centre de la carte.
  * @param {number} re_viewport_zoom Le nouveau niveau de zoom.
- * @param {string} re_viewport_opacity L'opacité du viewport.
+ * @param {number} re_viewport_opacity L'opacité du viewport.
  * @param {string} re_maplayer Le nouveau type de couche de carte.
  * @param {number} re_marker_timeout Le nouveau délai d'expiration des marqueurs en secondes.
  * @param {number} re_tail_timeout Le nouveau délai d'expiration des traces en secondes.
