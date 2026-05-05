@@ -216,12 +216,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
   },
+
   loadingText: {
     marginTop: 10,
     fontSize: 16,
