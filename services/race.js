@@ -1,7 +1,7 @@
 import { getDb } from './database';
 
 /**
- * @typedef {object} Race
+ * @typedef {object} DbRace
  * @property {number} ra_id
  * @property {number} ra_re_id
  * @property {string} ra_type
@@ -46,7 +46,7 @@ export const addRace = async (
 
 /**
  * Récupère toutes les courses de la base de données.
- * @returns {Promise<Race[]>} Un tableau d'objets Race.
+ * @returns {Promise<DbRace[]>} Un tableau d'objets DbRace.
  */
 export const getRaces = async () => {
   try {
@@ -63,7 +63,7 @@ export const getRaces = async () => {
     // }
 
     console.log("Races fetched:", result);
-    return /** @type {Race[]} */ (result); // Cast pour assurer le type
+    return /** @type {DbRace[]} */ (result); // Cast pour assurer le type
   } catch (error) {
     console.error("Error fetching races:", error);
     throw error;
@@ -73,7 +73,7 @@ export const getRaces = async () => {
 /**
  * Récupère une course par son ID.
  * @param {number} ra_id L'ID de la course à récupérer.
- * @returns {Promise<Race | null>} L'objet Race ou null si non trouvé.
+ * @returns {Promise<DbRace | null>} L'objet DbRace ou null si non trouvé.
  */
 export const getRaceById = async (ra_id) => {
   try {
@@ -82,7 +82,7 @@ export const getRaceById = async (ra_id) => {
       `SELECT * FROM race WHERE ra_id = ?`,
       [ra_id]
     );
-    return /** @type {Race | null} */ (result); // Cast pour assurer le type
+    return /** @type {DbRace | null} */ (result); // Cast pour assurer le type
   } catch (error) {
     console.error("Error fetching race by ID:", error);
     throw error;

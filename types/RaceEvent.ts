@@ -15,7 +15,8 @@ export type RaceEvent = {
   re_viewport_latitude: number;
   re_viewport_longitude: number;
   re_viewport_zoom: number;
-
+  re_viewport_opacity: number;
+    
   re_maplayer: string;
 
   re_marker_timeout: number;

@@ -1,7 +1,6 @@
-import { initDb } from "@/services/database";
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import React, { useEffect } from "react";
+import React from "react";
 import { StatusBar } from "react-native";
 
 // Screens
@@ -16,15 +15,6 @@ const eventsName = "Vos événements";
 const Tab = createBottomTabNavigator();
 
 function MainContainer() {
-
-    useEffect(() => {
-        // Initialize the database when the app starts
-        initDb().then(() => {
-            console.log("Database initialized successfully");
-        }).catch((error) => {
-            console.error("Error initializing database:", error);
-        });
-    }, []);
 
     return (
         <>

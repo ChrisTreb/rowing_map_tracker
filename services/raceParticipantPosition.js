@@ -2,7 +2,7 @@
 import { getDb } from './database';
 
 /**
- * @typedef {object} RaceParticipantPosition
+ * @typedef {object} DbRaceParticipantPosition
  * @property {number} rpp_id
  * @property {number} rpp_rp_id
  * @property {number} rp_date
@@ -43,7 +43,7 @@ export const addRaceParticipantPosition = async (
 /**
  * Récupère toutes les positions d'un participant par l'ID du participant.
  * @param {number} rp_id L'ID du participant de course.
- * @returns {Promise<RaceParticipantPosition[]>} Un tableau d'objets RaceParticipantPosition.
+ * @returns {Promise<DbRaceParticipantPosition[]>} Un tableau d'objets DbRaceParticipantPosition.
  */
 export const getRaceParticipantPositionsByParticipantId = async (rp_id) => {
   try {
@@ -52,7 +52,7 @@ export const getRaceParticipantPositionsByParticipantId = async (rp_id) => {
       `SELECT * FROM race_participant_position WHERE rpp_rp_id = ? ORDER BY rp_date ASC`,
       [rp_id]
     );
-    return /** @type {RaceParticipantPosition[]} */ (result);
+    return /** @type {DbRaceParticipantPosition[]} */ (result);
   } catch (error) {
     console.error("Error fetching race participant positions by participant ID:", error);
     throw error;

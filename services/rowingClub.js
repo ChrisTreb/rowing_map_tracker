@@ -2,7 +2,7 @@
 import { getDb } from './database';
 
 /**
- * @typedef {object} RowingClub
+ * @typedef {object} DbRowingClub
  * @property {number} rc_id
  * @property {string} rc_name
  * @property {string} rc_nickname
@@ -32,13 +32,13 @@ export const addRowingClub = async (rc_id, rc_name, rc_nickname) => { // Add rc_
 
 /**
  * Récupère tous les clubs d'aviron de la base de données.
- * @returns {Promise<RowingClub[]>} Un tableau d'objets RowingClub.
+ * @returns {Promise<DbRowingClub[]>} Un tableau d'objets DbRowingClub.
  */
 export const getRowingClubs = async () => {
   try {
     const db = getDb();
     const result = await db.getAllAsync(`SELECT * FROM rowing_club`);
-    return /** @type {RowingClub[]} */ (result);
+    return /** @type {DbRowingClub[]} */ (result);
   } catch (error) {
     console.error("Error fetching rowing clubs:", error);
     throw error;
@@ -48,7 +48,7 @@ export const getRowingClubs = async () => {
 /**
  * Récupère un club d'aviron par son ID.
  * @param {number} rc_id L'ID du club d'aviron à récupérer.
- * @returns {Promise<RowingClub | null>} L'objet RowingClub ou null si non trouvé.
+ * @returns {Promise<DbRowingClub | null>} L'objet DbRowingClub ou null si non trouvé.
  */
 export const getRowingClubById = async (rc_id) => {
   try {
@@ -57,7 +57,7 @@ export const getRowingClubById = async (rc_id) => {
       `SELECT * FROM rowing_club WHERE rc_id = ?`,
       [rc_id]
     );
-    return /** @type {RowingClub | null} */ (result);
+    return /** @type {DbRowingClub | null} */ (result);
   } catch (error) {
     console.error("Error fetching rowing club by ID:", error);
     throw error;

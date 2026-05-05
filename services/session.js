@@ -2,7 +2,7 @@
 import { getDb } from './database';
 
 /**
- * @typedef {object} Session
+ * @typedef {object} DbSession
  * @property {string} se_id
  * @property {number} se_user_id
  * @property {number} se_expires_at
@@ -37,7 +37,7 @@ export const addSession = async (
 /**
  * Récupère une session par son ID.
  * @param {string} se_id L'ID de la session à récupérer.
- * @returns {Promise<Session | null>} L'objet Session ou null si non trouvé.
+ * @returns {Promise<DbSession | null>} L'objet DbSession ou null si non trouvé.
  */
 export const getSessionById = async (se_id) => {
   try {
@@ -46,7 +46,7 @@ export const getSessionById = async (se_id) => {
       `SELECT * FROM session WHERE se_id = ?`,
       [se_id]
     );
-    return /** @type {Session | null} */ (result);
+    return /** @type {DbSession | null} */ (result);
   } catch (error) {
     console.error("Error fetching session by ID:", error);
     throw error;

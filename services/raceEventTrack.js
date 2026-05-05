@@ -2,7 +2,7 @@
 import { getDb } from './database';
 
 /**
- * @typedef {object} RaceEventTrack
+ * @typedef {object} DbRaceEventTrack
  * @property {number} ret_id
  * @property {number} ret_re_id
  * @property {string} ret_name
@@ -48,7 +48,7 @@ export const addRaceEventTrack = async (
 /**
  * Récupère toutes les pistes d'événement de course par l'ID de l'événement.
  * @param {number} re_id L'ID de l'événement de course.
- * @returns {Promise<RaceEventTrack[]>} Un tableau d'objets RaceEventTrack.
+ * @returns {Promise<DbRaceEventTrack[]>} Un tableau d'objets DbRaceEventTrack.
  */
 export const getRaceEventTracksByRaceEventId = async (re_id) => {
   try {
@@ -57,7 +57,7 @@ export const getRaceEventTracksByRaceEventId = async (re_id) => {
       `SELECT * FROM race_event_track WHERE ret_re_id = ?`,
       [re_id]
     );
-    return /** @type {RaceEventTrack[]} */ (result);
+    return /** @type {DbRaceEventTrack[]} */ (result);
   } catch (error) {
     console.error("Error fetching race event tracks by race event ID:", error);
     throw error;
@@ -67,7 +67,7 @@ export const getRaceEventTracksByRaceEventId = async (re_id) => {
 /**
  * Récupère une piste d'événement de course par son ID.
  * @param {number} ret_id L'ID de la piste d'événement à récupérer.
- * @returns {Promise<RaceEventTrack | null>} L'objet RaceEventTrack ou null si non trouvé.
+ * @returns {Promise<DbRaceEventTrack | null>} L'objet DbRaceEventTrack ou null si non trouvé.
  */
 export const getRaceEventTrackById = async (ret_id) => {
   try {
@@ -76,7 +76,7 @@ export const getRaceEventTrackById = async (ret_id) => {
       `SELECT * FROM race_event_track WHERE ret_id = ?`,
       [ret_id]
     );
-    return /** @type {RaceEventTrack | null} */ (result);
+    return /** @type {DbRaceEventTrack | null} */ (result);
   } catch (error) {
     console.error("Error fetching race event track by ID:", error);
     throw error;

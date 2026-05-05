@@ -2,7 +2,7 @@
 import { getDb } from './database';
 
 /**
- * @typedef {object} User
+ * @typedef {object} DbUser
  * @property {number} usr_id
  * @property {string | null} usr_name
  * @property {string} usr_apikey
@@ -40,7 +40,7 @@ export const addUser = async (
 /**
  * Récupère un utilisateur par son ID.
  * @param {number} usr_id L'ID de l'utilisateur à récupérer.
- * @returns {Promise<User | null>} L'objet User ou null si non trouvé.
+ * @returns {Promise<DbUser | null>} L'objet DbUser ou null si non trouvé.
  */
 export const getUserById = async (usr_id) => {
   try {
@@ -49,7 +49,7 @@ export const getUserById = async (usr_id) => {
       `SELECT * FROM user WHERE usr_id = ?`,
       [usr_id]
     );
-    return /** @type {User | null} */ (result);
+    return /** @type {DbUser | null} */ (result);
   } catch (error) {
     console.error("Error fetching user by ID:", error);
     throw error;

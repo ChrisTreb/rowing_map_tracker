@@ -2,7 +2,7 @@
 import { getDb } from './database';
 
 /**
- * @typedef {object} RaceParticipant
+ * @typedef {object} DbRaceParticipant
  * @property {number} rp_id
  * @property {number} rp_ra_id
  * @property {string | null} rp_bib
@@ -49,7 +49,7 @@ export const addRaceParticipant = async (
 /**
  * Récupère tous les participants d'une course par l'ID de la course.
  * @param {number} ra_id L'ID de la course.
- * @returns {Promise<RaceParticipant[]>} Un tableau d'objets RaceParticipant.
+ * @returns {Promise<DbRaceParticipant[]>} Un tableau d'objets DbRaceParticipant.
  */
 export const getRaceParticipantsByRaceId = async (ra_id) => {
   try {
@@ -58,7 +58,7 @@ export const getRaceParticipantsByRaceId = async (ra_id) => {
       `SELECT * FROM race_participant WHERE rp_ra_id = ?`,
       [ra_id]
     );
-    return /** @type {RaceParticipant[]} */ (result);
+    return /** @type {DbRaceParticipant[]} */ (result);
   } catch (error) {
     console.error("Error fetching race participants by race ID:", error);
     throw error;
@@ -68,7 +68,7 @@ export const getRaceParticipantsByRaceId = async (ra_id) => {
 /**
  * Récupère un participant de course par son ID.
  * @param {number} rp_id L'ID du participant à récupérer.
- * @returns {Promise<RaceParticipant | null>} L'objet RaceParticipant ou null si non trouvé.
+ * @returns {Promise<DbRaceParticipant | null>} L'objet DbRaceParticipant ou null si non trouvé.
  */
 export const getRaceParticipantById = async (rp_id) => {
   try {
@@ -77,7 +77,7 @@ export const getRaceParticipantById = async (rp_id) => {
       `SELECT * FROM race_participant WHERE rp_id = ?`,
       [rp_id]
     );
-    return /** @type {RaceParticipant | null} */ (result);
+    return /** @type {DbRaceParticipant | null} */ (result);
   } catch (error) {
     console.error("Error fetching race participant by ID:", error);
     throw error;

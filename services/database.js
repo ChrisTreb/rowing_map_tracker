@@ -69,7 +69,7 @@ export const initDb = async () => {
         re_event_visibility INTEGER NOT NULL,
         re_event_start_date_and_time INTEGER NOT NULL,
         re_event_end_date_and_time INTEGER NOT NULL,
-        re_event_random_id_edit TEXT NOT NULL UNIQUE,
+        re_event_random_id_edit TEXT NOT NULL,
         re_event_random_id_viewer TEXT NOT NULL UNIQUE,
         re_viewport_latitude DECIMAL NOT NULL,
         re_viewport_longitude DECIMAL NOT NULL,
@@ -78,7 +78,8 @@ export const initDb = async () => {
         re_maplayer TEXT NOT NULL,
         re_marker_timeout INTEGER NOT NULL DEFAULT 180,
 	      re_tail_timeout INTEGER NOT NULL DEFAULT 180,
-	      re_flag_content INTEGER NOT NULL DEFAULT 0
+	      re_flag_content INTEGER NOT NULL DEFAULT 0,
+        nb_participants INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS race_event_track (
