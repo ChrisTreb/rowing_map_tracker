@@ -51,8 +51,6 @@ export const initDb = async () => {
 
       CREATE TABLE IF NOT EXISTS user (
         usr_id INTEGER NOT NULL PRIMARY KEY,
-        usr_google_id TEXT NOT NULL UNIQUE,
-        usr_email TEXT NOT NULL UNIQUE,
         usr_name TEXT NULL,
         usr_apikey TEXT NOT NULL UNIQUE,
         usr_rc_id INTEGER REFERENCES rowing_club(rc_id) ON DELETE SET NULL
@@ -67,16 +65,20 @@ export const initDb = async () => {
       CREATE TABLE IF NOT EXISTS race_event (
         re_id INTEGER NOT NULL PRIMARY KEY,
         re_user_id INTEGER NOT NULL REFERENCES user(usr_id) ON DELETE CASCADE,
-        re_eventName TEXT NOT NULL,
-        re_eventVisibility INTEGER NOT NULL,
-        re_eventStartDateAndTime INTEGER NOT NULL,
-        re_eventEndDateAndTime INTEGER NOT NULL,
-        re_eventRandomId_edit TEXT NOT NULL UNIQUE,
-        re_eventRandomId_viewer TEXT NOT NULL UNIQUE,
+        re_event_name TEXT NOT NULL,
+        re_event_visibility INTEGER NOT NULL,
+        re_event_start_date_and_time INTEGER NOT NULL,
+        re_event_end_date_and_time INTEGER NOT NULL,
+        re_event_random_id_edit TEXT NOT NULL UNIQUE,
+        re_event_random_id_viewer TEXT NOT NULL UNIQUE,
         re_viewport_latitude DECIMAL NOT NULL,
         re_viewport_longitude DECIMAL NOT NULL,
         re_viewport_zoom INTEGER NOT NULL,
-        re_maplayer TEXT NOT NULL
+        re_viewport_opacity DECIMAL NOT NULL,
+        re_maplayer TEXT NOT NULL,
+        re_marker_timeout INTEGER NOT NULL DEFAULT 180,
+	      re_tail_timeout INTEGER NOT NULL DEFAULT 180,
+	      re_flag_content INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS race_event_track (
@@ -101,9 +103,9 @@ export const initDb = async () => {
       CREATE TABLE IF NOT EXISTS race_participant_position (
         rpp_id INTEGER NOT NULL PRIMARY KEY,
         rpp_rp_id INTEGER NOT NULL REFERENCES race_participant(rp_id) ON DELETE CASCADE,
-        rp_date INTEGER NOT NULL,
-        rpp_viewport_latitude DECIMAL NOT NULL,
-        rpp_viewport_longitude DECIMAL NOT NULL
+        rpp_date INTEGER NOT NULL,
+        rpp_latitude DECIMAL NOT NULL,
+        rpp_longitude DECIMAL NOT NULL
       );
     `);
     // ... end of existing schema definition ...

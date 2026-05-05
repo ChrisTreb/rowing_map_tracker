@@ -1,6 +1,7 @@
 export type Position = {
-    participant_id: number;
-    latitude: number;
-    longitude: number;
-    timestamp: string;
+    rpp_id: number;
+    rpp_rp_key: string;
+    rpp_date: number;
+    rpp_latitude: number;
+    rpp_longitude: number;
 };

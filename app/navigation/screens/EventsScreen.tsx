@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { RaceEvent } from "../../../types/RaceEvent";
 import { formatDateTime } from "../../../utils/dateUtils";
 
-const HomeScreen = () => {
+const EventsScreen = () => {
   const [events, setEvents] = useState<RaceEvent[]>([]);
 
+  // Get race events from the API and sort them by end date in descending order
   const getRaceEvents = async () => {
     try {
       const apiURL = process.env.EXPO_PUBLIC_API_URL;
@@ -39,6 +40,11 @@ const HomeScreen = () => {
     }
   };
 
+  // Function to handle button press to enter participant code
+  const onPressFunction = () => {
+    console.log("Button pressed!");
+  };
+
   useEffect(() => {
     getRaceEvents();
   }, []);
@@ -66,6 +72,9 @@ const HomeScreen = () => {
         renderItem={renderItem}
         contentContainerStyle={{ padding: 10 }}
       />
+      <Pressable style={styles.button} onPress={onPressFunction}>
+        <Text style={styles.buttonText}>Entrez votre code</Text>
+      </Pressable>
     </View>
   );
 };
@@ -91,6 +100,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#555",
   },
+
+  button: {
+    backgroundColor: "#007bff",
+    padding: 15,
+    borderRadius: 12,
+    height: 80,
+    justifyContent: "center",
+    alignItems: "center",
+    margin: 10,
+  },
+
+  buttonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
 });
 
-export default HomeScreen;
+export default EventsScreen;

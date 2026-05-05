@@ -1,5 +1,6 @@
 export type Race = {
-    event_id: number;
-    type: string;
-    name: string;
+    ra_id: number;
+    ra_re_id: number;
+    ra_type: string;
+    ra_name: string;
 };

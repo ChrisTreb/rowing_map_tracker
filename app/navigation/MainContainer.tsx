@@ -1,25 +1,37 @@
+import { initDb } from "@/services/database";
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import React, { useEffect } from "react";
 import { StatusBar } from "react-native";
 
 // Screens
-import HomeScreen from "./screens/HomeScreen";
+import EventsScreen from "./screens/EventsScreen";
 
 // TS interface for icon names
 type IconName = keyof typeof Ionicons.glyphMap;
 
 //Screen names
-const homeName = "Home";
+const eventsName = "Vos événements";
 
 const Tab = createBottomTabNavigator();
 
 function MainContainer() {
+
+    useEffect(() => {
+        // Initialize the database when the app starts
+        initDb().then(() => {
+            console.log("Database initialized successfully");
+        }).catch((error) => {
+            console.error("Error initializing database:", error);
+        });
+    }, []);
+
     return (
         <>
             <StatusBar animated={true} backgroundColor="#1E90FF" />
 
             <Tab.Navigator
-                initialRouteName={homeName}
+                initialRouteName={eventsName}
                 screenOptions={({ route }) => ({
                     tabBarActiveTintColor: "#1E90FF",
                     tabBarInactiveTintColor: "grey",
@@ -38,7 +50,7 @@ function MainContainer() {
                         let iconName: IconName = "help-circle"; // fallback
                         let rn = route.name;
 
-                        if (rn === homeName) {
+                        if (rn === eventsName) {
                             iconName = focused ? "home" : "home-outline";
                         }
 
@@ -47,7 +59,7 @@ function MainContainer() {
                     },
                 })}
             >
-                <Tab.Screen name={homeName} component={HomeScreen} />
+                <Tab.Screen name={eventsName} component={EventsScreen} />
 
                 { }
             </Tab.Navigator>
