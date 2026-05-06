@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { initDb } from "../../../services/database";
 import { DbRaceEvent, addRaceEvent, getRaceEventById, getRaceEvents, updateRaceEvent } from "../../../services/raceEvent";
 import { RaceEvent } from "../../../types/RaceEvent";
@@ -8,6 +8,12 @@ import { formatDateTime } from "../../../utils/dateUtils";
 const EventsScreen = () => {
   const [dbEvents, setDbEvents] = useState<DbRaceEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true); // État pour indiquer le chargement/la synchronisation
+
+  // État pour le contenu de l'input du code participant
+  const [participantCode, setParticipantCode] = useState("");
+
+  // État de visibilité du modal
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   // Fonction pour récupérer les événements de l'API et les synchroniser avec la DB locale
   const syncApiRaceEventsToLocalDb = async () => {
@@ -35,51 +41,51 @@ const EventsScreen = () => {
           if (existingEvent) {
             // Mettre à jour l'événement existant
             await updateRaceEvent(
-                event.re_id,
-                event.re_event_name,
-                visibility,
-                event.re_event_start_date_and_time,
-                event.re_event_end_date_and_time,
-                event.re_event_random_id_edit,
-                event.re_event_random_id_viewer,
-                event.re_viewport_latitude,
-                event.re_viewport_longitude,
-                event.re_viewport_zoom,
-                event.re_viewport_opacity,
-                event.re_maplayer,
-                event.re_marker_timeout,
-                event.re_tail_timeout,
-                event.re_flag_content,
-                event.nb_participants
+              event.re_id,
+              event.re_event_name,
+              visibility,
+              event.re_event_start_date_and_time,
+              event.re_event_end_date_and_time,
+              event.re_event_random_id_edit,
+              event.re_event_random_id_viewer,
+              event.re_viewport_latitude,
+              event.re_viewport_longitude,
+              event.re_viewport_zoom,
+              event.re_viewport_opacity,
+              event.re_maplayer,
+              event.re_marker_timeout,
+              event.re_tail_timeout,
+              event.re_flag_content,
+              event.nb_participants
             );
             console.log(`Event with ID ${event.re_id} updated.`);
           } else {
             // Ajouter le nouvel événement
             await addRaceEvent(
-                event.re_id,
-                event.re_user_id,
-                event.re_event_name,
-                visibility,
-                event.re_event_start_date_and_time,
-                event.re_event_end_date_and_time,
-                event.re_event_random_id_edit,
-                event.re_event_random_id_viewer,
-                event.re_viewport_latitude,
-                event.re_viewport_longitude,
-                event.re_viewport_zoom,
-                event.re_viewport_opacity,
-                event.re_maplayer,
-                event.re_marker_timeout,
-                event.re_tail_timeout,
-                event.re_flag_content,
-                event.nb_participants
+              event.re_id,
+              event.re_user_id,
+              event.re_event_name,
+              visibility,
+              event.re_event_start_date_and_time,
+              event.re_event_end_date_and_time,
+              event.re_event_random_id_edit,
+              event.re_event_random_id_viewer,
+              event.re_viewport_latitude,
+              event.re_viewport_longitude,
+              event.re_viewport_zoom,
+              event.re_viewport_opacity,
+              event.re_maplayer,
+              event.re_marker_timeout,
+              event.re_tail_timeout,
+              event.re_flag_content,
+              event.nb_participants
             );
             console.log(`Event with ID ${event.re_id} added.`);
           }
-    } catch (error) {
+        } catch (error) {
           console.error(`Error syncing event ${event.re_id} to local database:`, error);
           throw error; // Propager l'erreur pour que Promise.allSettled la capture
-    }
+        }
       });
 
       // Exécuter toutes les promesses de synchronisation en parallèle
@@ -107,7 +113,7 @@ const EventsScreen = () => {
       eventsFromDb.sort(
         (a: DbRaceEvent, b: DbRaceEvent) =>
           b.re_event_end_date_and_time - a.re_event_start_date_and_time
-    );
+      );
       setDbEvents(eventsFromDb);
     } catch (error) {
       console.error("Error retrieving race events from local database:", error);
@@ -130,14 +136,25 @@ const EventsScreen = () => {
       } finally {
         setIsLoading(false);
       }
-};
+    };
 
     initializeAndSync();
   }, []); // Exécuter une seule fois au montage du composant
 
-  const onPressFunction = () => {
-    console.log("Button pressed!");
-    // Logique pour entrer un code participant
+  // ===================================================================
+  // LOGIQUE DU MODAL ET DE L'INPUT
+  // ===================================================================
+
+  const handleParticipantCodeSubmit = () => {
+    if (participantCode.trim() === "") return;
+
+    console.log(`Tentative d'accès avec le code: ${participantCode}`);
+
+    // Ici, vous ajouterez la logique qui interagit avec votre service de participant
+    // Exemple : callApiToVerifyParticipant(participantCode);
+
+    // Fermer le modal après la soumission
+    setIsModalVisible(false);
   };
 
   const renderItem = ({ item }: { item: DbRaceEvent }) => {
@@ -172,9 +189,52 @@ const EventsScreen = () => {
         renderItem={renderItem}
         contentContainerStyle={{ padding: 10 }}
       />
-      <Pressable style={styles.button} onPress={onPressFunction}>
+      {/* Bouton déclencheur de la modale */}
+      <Pressable style={styles.button} onPress={() => setIsModalVisible(true)}>
         <Text style={styles.buttonText}>Entrez votre code</Text>
       </Pressable>
+
+      {/* MODAL POUR ENTRER LE CODE PARTICIPANT */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={() => {
+          // Fermer le modal si l'utilisateur appuie sur le bouton retour du système
+          setIsModalVisible(false);
+        }}
+      >
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            {/* Titre */}
+            <Text style={styles.modalTitle}>Entrez votre code</Text>
+
+            {/* Input du code */}
+            <TextInput
+              style={styles.inputCode}
+              placeholder="----"
+              value={participantCode}
+              onChangeText={(text) => setParticipantCode(text)}
+              autoCapitalize='characters'
+              maxLength={4}
+            />
+
+            {/* Bouton de soumission */}
+            <Pressable
+              style={[styles.button, { marginTop: 20 }]}
+              onPress={handleParticipantCodeSubmit}
+              disabled={!participantCode.trim()} // Désactiver si le champ est vide
+            >
+              <Text style={styles.buttonText}>Valider</Text>
+            </Pressable>
+
+            {/* Bouton de fermeture */}
+            <Pressable onPress={() => setIsModalVisible(false)}>
+              <Text style={styles.closeButton}>Fermer</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -212,6 +272,9 @@ const styles = StyleSheet.create({
   },
 
   buttonText: {
+    minWidth: 200,
+    width: "100%",
+    textAlign: "center",
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
@@ -229,7 +292,59 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#555',
   },
+
+  // Styles pour la Modale
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Fond semi-transparent
+  },
+
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 30,
+    color: '#333',
+  },
+
+  inputCode: {
+    textAlign: 'center',
+    width: 150,
+    height: 80,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    fontSize: 36,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  
+  closeButton: {
+    borderWidth: 1,
+    borderColor: '#999',
+    borderRadius: 8,
+    color: '#999',
+    padding: 10,
+    marginTop: 10,
+    fontSize: 16,
+  }
 });
 
 export default EventsScreen;
+
 
