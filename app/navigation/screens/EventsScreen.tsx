@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { initDb } from "../../../services/database";
 import { DbRaceEvent, addRaceEvent, getRaceEventById, getRaceEvents, updateRaceEvent } from "../../../services/raceEvent";
 import { RaceEvent } from "../../../types/RaceEvent";
@@ -16,19 +16,26 @@ const EventsScreen = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   // Fonction pour récupérer les événements de l'API et les synchroniser avec la DB locale
-  const syncApiRaceEventsToLocalDb = async () => {
+  const syncApiRaceEventsToLocalDb = async (participantCode: string) => {
     try {
       const apiURL = process.env.EXPO_PUBLIC_API_URL;
-      const apiKey = process.env.EXPO_PUBLIC_API_KEY;
 
       const response = await fetch(`${apiURL}/raceevents`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "Api-Key": `${apiKey}`,
+          "Api-Key": `${participantCode}`,
         },
       });
       const data = await response.json();
+      const responseStatus = response.status;
+
+      console.log("API response status:", response.status);
+
+      if (responseStatus === 401) { // TODO : vérifier le code exact renvoyé par l'API pour un code invalide
+        Alert.alert("Code invalide", "Le code que vous avez entré est incorrect. Veuillez réessayer.");
+        return;
+      }
 
       // Préparer toutes les opérations d'insertion/mise à jour en parallèle
       const syncPromises = data.raceevents.map(async (event: RaceEvent) => {
@@ -127,12 +134,12 @@ const EventsScreen = () => {
         setIsLoading(true);
         await initDb();
         console.log("Database initialized successfully.");
-        await syncApiRaceEventsToLocalDb();
+        await syncApiRaceEventsToLocalDb("____"); // Utiliser un code vide ou par défaut pour la synchronisation initiale
         console.log("API events synced to local database.");
         await loadLocalRaceEvents();
         console.log("Local events loaded into state.");
       } catch (error) {
-        console.error("Initialization or sync failed:", error);
+        console.error("Database initialization failed:", error);
       } finally {
         setIsLoading(false);
       }
@@ -144,17 +151,23 @@ const EventsScreen = () => {
   // ===================================================================
   // LOGIQUE DU MODAL ET DE L'INPUT
   // ===================================================================
-
-  const handleParticipantCodeSubmit = () => {
+  const handleParticipantCodeSubmit = async () => {
     if (participantCode.trim() === "") return;
 
-    console.log(`Tentative d'accès avec le code: ${participantCode}`);
+    try {
+      console.log(`Tentative d'accès avec le code: ${participantCode}`);
 
-    // Ici, vous ajouterez la logique qui interagit avec votre service de participant
-    // Exemple : callApiToVerifyParticipant(participantCode);
+      await syncApiRaceEventsToLocalDb(participantCode);
+      console.log("API events synced to local database.");
+      await loadLocalRaceEvents();
+      console.log("Local events loaded into state.");
 
-    // Fermer le modal après la soumission
-    setIsModalVisible(false);
+      // Fermer le modal après la soumission
+      setIsModalVisible(false);
+    } catch (error) {
+      console.error("Error during participant code submission:", error);
+      Alert.alert("Erreur", "Une erreur est survenue lors de la soumission du code. Veuillez réessayer.");
+    }
   };
 
   const renderItem = ({ item }: { item: DbRaceEvent }) => {
@@ -333,7 +346,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
   },
-  
+
   closeButton: {
     borderWidth: 1,
     borderColor: '#999',

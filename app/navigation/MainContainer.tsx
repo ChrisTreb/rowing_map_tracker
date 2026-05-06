@@ -10,7 +10,7 @@ import EventsScreen from "./screens/EventsScreen";
 type IconName = keyof typeof Ionicons.glyphMap;
 
 //Screen names
-const eventsName = "Vos événements";
+const eventsName = "Evénements";
 
 const Tab = createBottomTabNavigator();
 
