@@ -35,6 +35,7 @@ export const initDb = async () => {
       DROP TABLE IF EXISTS session;
       DROP TABLE IF EXISTS user;
       DROP TABLE IF EXISTS rowing_club;
+      DROP TABLE IF EXISTS phone_rp_keys;
 
       CREATE TABLE IF NOT EXISTS race (
         ra_id INTEGER NOT NULL PRIMARY KEY,
@@ -108,6 +109,11 @@ export const initDb = async () => {
         rpp_latitude DECIMAL NOT NULL,
         rpp_longitude DECIMAL NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS phone_rp_keys (
+        prk_id INTEGER NOT NULL PRIMARY KEY,
+        prk_rp_key TEXT NOT NULL UNIQUE
+      );
     `);
     // ... end of existing schema definition ...
 
@@ -130,6 +136,7 @@ export const resetDatabase = async () => {
       DELETE FROM race_participant;
       DELETE FROM race;
       DELETE FROM race_event_track;
+      DELETE FROM phone_rp_keys;
       DELETE FROM race_event;
       DELETE FROM session;
       DELETE FROM user;
@@ -143,6 +150,7 @@ export const resetDatabase = async () => {
 };
 
 // Import and re-export all specific operations
+import * as phoneKeysOperations from './phoneKeys';
 import * as raceOperations from './race';
 import * as raceEventOperations from './raceEvent';
 import * as raceEventTrackOperations from './raceEventTrack';
@@ -152,6 +160,7 @@ import * as rowingClubOperations from './rowingClub';
 import * as sessionOperations from './session';
 import * as userOperations from './user';
 
+export const { addPhoneRpKey, getPhoneRpKeys, deletePhoneRpKey } = phoneKeysOperations;
 export const { addRace, getRaces, getRaceById } = raceOperations;
 export const { addRowingClub, getRowingClubs, getRowingClubById, updateRowingClub, deleteRowingClub } = rowingClubOperations;
 export const { addUser, getUserById, updateUser, deleteUser } = userOperations;
