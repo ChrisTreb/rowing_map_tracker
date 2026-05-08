@@ -1,18 +1,17 @@
-import { PhoneKeys } from "@/types/PhoneKeys";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { initDb } from "../../../services/database";
-import { addPhoneRpKey, deleteExpiredPhoneRpKeys, getPhoneRpKeys, updatePhoneRpKey } from "../../../services/phoneKeys";
+import { DbPhoneRpKey, addPhoneRpKey, deleteExpiredPhoneRpKeys, getPhoneRpKeys, updatePhoneRpKey } from "../../../services/phoneKeys";
 import { DbRaceEvent, addRaceEvent, getRaceEventById, getRaceEvents, updateRaceEvent } from "../../../services/raceEvent";
 import { RaceEvent } from "../../../types/RaceEvent";
-import { formatDateTime } from "../../../utils/dateUtils";
+import EventCard from "../../components/EventCard";
 
 
 const EventsScreen = () => {
   const [dbEvents, setDbEvents] = useState<DbRaceEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true); // État pour indiquer le chargement/la synchronisation
 
-  const [phoneRpKeys, setPhoneRpKeys] = useState<PhoneKeys[]>([]);
+  const [phoneRpKeys, setPhoneRpKeys] = useState<DbPhoneRpKey[]>([]);
 
   // État pour le contenu de l'input du code participant
   const [participantCode, setParticipantCode] = useState("");
@@ -101,9 +100,16 @@ const EventsScreen = () => {
               await updatePhoneRpKey(event.re_id, event.re_event_end_date_and_time, event.my_rp_key);
             }
           }
-
         } catch (error) {
           console.error(`Error syncing event ${event.re_id} to local database:`, error);
+          throw error; // Propager l'erreur pour que Promise.allSettled la capture
+        }
+
+        try {
+          // Retourner la liste mise à jour des clés de participant après chaque synchronisation d'événement
+          setPhoneRpKeys(await getPhoneRpKeys());
+        } catch (error) {
+          console.error("Error retrieving phone RP keys after syncing event:", error);
           throw error; // Propager l'erreur pour que Promise.allSettled la capture
         }
       });
@@ -171,9 +177,9 @@ const EventsScreen = () => {
   }, []); // Exécuter une seule fois au montage du composant
 
   // ===================================================================
-  // LOGIQUE DU MODAL ET DE L'INPUT
+  // LOGIQUE DU MODAL ET DE L'INPUT DU CODE PARTICIPANT
   // ===================================================================
-  const handleParticipantCodeSubmit = async () => {
+  const handleParticipantCodeSubmit: () => Promise<void> = async () => {
     if (participantCode.trim() === "") return;
 
     try {
@@ -188,6 +194,8 @@ const EventsScreen = () => {
       setIsModalVisible(false);
       // Réinitialiser le champ de saisie du code participant
       setParticipantCode("");
+
+      console.log("Participant code submitted and processed successfully. ", phoneRpKeys);
     } catch (error) {
       console.error("Error during participant code submission:", error);
       Alert.alert("Erreur", "Une erreur est survenue lors de la soumission du code. Veuillez réessayer.");
@@ -195,23 +203,7 @@ const EventsScreen = () => {
   };
 
   const renderItem = ({ item }: { item: DbRaceEvent }) => {
-    return (
-      <View style={styles.card}>
-        <Text style={styles.title}>{item.re_event_name}</Text>
-        <Text style={styles.text}>Participants: {item.nb_participants}</Text>
-        <Text style={styles.text}>
-          Début: {formatDateTime(item.re_event_start_date_and_time)}
-        </Text>
-        <Text style={styles.text}>
-          Fin: {formatDateTime(item.re_event_end_date_and_time)}
-        </Text>
-        {item.my_rp_key && (
-          <Text style={styles.text}>
-            Ma clé: {item.my_rp_key}
-          </Text>
-        )}
-      </View>
-    );
+    return <EventCard event={item} />;
   };
 
   if (isLoading) {

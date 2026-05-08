@@ -1,0 +1,75 @@
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { DbPhoneRpKey, getPhoneRpKeysByRaceEventId } from "../../services/phoneKeys";
+import { DbRaceEvent } from "../../services/raceEvent";
+import { formatDateTime } from "../../utils/dateUtils";
+
+interface EventCardProps {
+  event: DbRaceEvent;
+}
+
+const EventCard = ({ event }: EventCardProps) => {
+  const [associatedKeys, setAssociatedKeys] = useState<DbPhoneRpKey[]>([]);
+  const [keysLoading, setKeysLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchKeys = async () => {
+      try {
+        setKeysLoading(true);
+        const keys = await getPhoneRpKeysByRaceEventId(event.re_id);
+        setAssociatedKeys(keys);
+      } catch (error) {
+        console.error(`Error fetching keys for event ${event.re_id}:`, error);
+        setAssociatedKeys([]);
+      } finally {
+        setKeysLoading(false);
+      }
+    };
+    fetchKeys();
+  }, [event.re_id]); // Re-déclencher si l'ID de l'événement change
+
+  const participantKeyView = associatedKeys.map(key => key.prk_rp_key).join(", ");
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.title}>{event.re_event_name}</Text>
+      <Text style={styles.text}>Participants: {event.nb_participants}</Text>
+      <Text style={styles.text}>
+        Début: {formatDateTime(event.re_event_start_date_and_time)}
+      </Text>
+      <Text style={styles.text}>
+        Fin: {formatDateTime(event.re_event_end_date_and_time)}
+      </Text>
+      {/* Afficher toutes les clés associées de la DB locale */}
+      {!keysLoading && associatedKeys.length > 0 && (
+        <Text style={styles.text}>
+          <Ionicons name="key" size={16} color="#2c2c2c" /> {participantKeyView}
+        </Text>
+      )}
+      {keysLoading && <ActivityIndicator size="small" color="#007bff" />}
+    </View>
+  );
+};
+
+// Styles réutilisés pour la carte
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: "#f5f7ff",
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 10,
+    elevation: 2,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  text: {
+    fontSize: 13,
+    color: "#555",
+  },
+});
+
+export default EventCard;

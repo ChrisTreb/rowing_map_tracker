@@ -1,7 +1,7 @@
 import { getDb } from './database';
 
 /**
- * @typedef {object} PhoneRpKey
+ * @typedef {object} DbPhoneRpKey
  * @property {number} prk_id
  * @property {string} prk_rp_key
  * @property {number} re_id
@@ -31,7 +31,7 @@ export const addPhoneRpKey = async (rp_key, re_id, re_event_end_date_and_time) =
 
 /**
  * Retrieves all phone RP keys from the database.
- * @returns {Promise<PhoneRpKey[]>} A promise that resolves to an array of phone RP keys.
+ * @returns {Promise<DbPhoneRpKey[]>} A promise that resolves to an array of phone RP keys.
  */
 export const getPhoneRpKeys = async () => {
     try {
@@ -92,6 +92,23 @@ export const updatePhoneRpKey = async (re_id, re_event_end_date_and_time, prk_rp
         console.log("Phone RP key updated: ", prk_rp_key);
     } catch (error) {
         console.error("Error updating phone RP key:", error);
+        throw error;
+    }
+};
+
+/**
+ * Retrieves keys associated with a specific race event ID.
+ * @param {number} re_id - The ID of the race event.
+ * @returns {Promise<DbPhoneRpKey[]>} A promise that resolves to an array of phone RP keys associated with the given race event ID.
+ */
+export const getPhoneRpKeysByRaceEventId = async (re_id) => {
+    try {
+        const db = getDb();
+        const result = await db.getAllAsync(
+            `SELECT * FROM phone_rp_keys WHERE re_id = ?`,[re_id]);
+        return result;
+    } catch (error) {
+        console.error("Error retrieving phone RP keys by race event ID:", error);
         throw error;
     }
 };
