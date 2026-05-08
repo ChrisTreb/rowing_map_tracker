@@ -1,13 +1,18 @@
+import { PhoneKeys } from "@/types/PhoneKeys";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { initDb } from "../../../services/database";
+import { addPhoneRpKey, deleteExpiredPhoneRpKeys, getPhoneRpKeys, updatePhoneRpKey } from "../../../services/phoneKeys";
 import { DbRaceEvent, addRaceEvent, getRaceEventById, getRaceEvents, updateRaceEvent } from "../../../services/raceEvent";
 import { RaceEvent } from "../../../types/RaceEvent";
 import { formatDateTime } from "../../../utils/dateUtils";
 
+
 const EventsScreen = () => {
   const [dbEvents, setDbEvents] = useState<DbRaceEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true); // État pour indiquer le chargement/la synchronisation
+
+  const [phoneRpKeys, setPhoneRpKeys] = useState<PhoneKeys[]>([]);
 
   // État pour le contenu de l'input du code participant
   const [participantCode, setParticipantCode] = useState("");
@@ -58,7 +63,8 @@ const EventsScreen = () => {
               event.re_marker_timeout,
               event.re_tail_timeout,
               event.re_flag_content,
-              event.nb_participants
+              event.nb_participants,
+              event.my_rp_key
             );
             console.log(`Event with ID ${event.re_id} updated.`);
           } else {
@@ -80,10 +86,22 @@ const EventsScreen = () => {
               event.re_marker_timeout,
               event.re_tail_timeout,
               event.re_flag_content,
-              event.nb_participants
+              event.nb_participants,
+              event.my_rp_key
             );
             console.log(`Event with ID ${event.re_id} added.`);
           }
+
+          // Ajouter la clé de participant à la table phone_rp_keys si elle n'existe pas déjà et si elle est valide
+          if (event.my_rp_key) {
+            const existingKey = phoneRpKeys.find(key => key.prk_rp_key === event.my_rp_key);
+            if (!existingKey) {
+              await addPhoneRpKey(event.my_rp_key, event.re_id, event.re_event_end_date_and_time);
+            } else {
+              await updatePhoneRpKey(event.re_id, event.re_event_end_date_and_time, event.my_rp_key);
+            }
+          }
+
         } catch (error) {
           console.error(`Error syncing event ${event.re_id} to local database:`, error);
           throw error; // Propager l'erreur pour que Promise.allSettled la capture
@@ -129,8 +147,17 @@ const EventsScreen = () => {
         setIsLoading(true);
         await initDb();
         console.log("Database initialized successfully.");
-        await syncApiRaceEventsToLocalDb("____"); // Utiliser un code vide ou par défaut pour la synchronisation initiale
+        // Supprimer les clés de participant expirées avant de charger les événements
+        await deleteExpiredPhoneRpKeys();
+        console.log("Expired phone RP keys deleted.");
+        // Charger les clés de participant depuis la base de données locale
+        const keys = await getPhoneRpKeys();
+        setPhoneRpKeys(keys);
+        console.log("Phone RP keys loaded:", keys);
+        // Synchronisation initiale avec un code vide ou par défaut pour charger les événements sans code spécifique
+        await syncApiRaceEventsToLocalDb("____");
         console.log("API events synced to local database.");
+        // Charger les événements locaux après la synchronisation
         await loadLocalRaceEvents();
         console.log("Local events loaded into state.");
       } catch (error) {
@@ -159,6 +186,8 @@ const EventsScreen = () => {
 
       // Fermer le modal après la soumission
       setIsModalVisible(false);
+      // Réinitialiser le champ de saisie du code participant
+      setParticipantCode("");
     } catch (error) {
       console.error("Error during participant code submission:", error);
       Alert.alert("Erreur", "Une erreur est survenue lors de la soumission du code. Veuillez réessayer.");
@@ -176,6 +205,11 @@ const EventsScreen = () => {
         <Text style={styles.text}>
           Fin: {formatDateTime(item.re_event_end_date_and_time)}
         </Text>
+        {item.my_rp_key && (
+          <Text style={styles.text}>
+            Ma clé: {item.my_rp_key}
+          </Text>
+        )}
       </View>
     );
   };

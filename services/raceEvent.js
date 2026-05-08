@@ -20,6 +20,7 @@ import { getDb } from './database';
  * @property {number} re_tail_timeout
  * @property {number} re_flag_content
  * @property {number} nb_participants
+ * @property {string|null} my_rp_key
  */
 
 /**
@@ -41,6 +42,7 @@ import { getDb } from './database';
  * @param {number} re_tail_timeout Le délai d'expiration des traces en secondes (optionnel, par défaut 180).
  * @param {number} re_flag_content Le contenu du drapeau de l'événement (optionnel, par défaut 0).
  * @param {number} nb_participants Le nombre de participants à l'événement (optionnel, par défaut 0).
+ * @param {string|null} my_rp_key La clé de participant associée à l'événement (optionnel, par défaut null).
  * @returns {Promise<number>} L'ID de l'événement de course ajouté.
  */
 export const addRaceEvent = async (
@@ -60,14 +62,15 @@ export const addRaceEvent = async (
   re_marker_timeout,
   re_tail_timeout,
   re_flag_content,
-  nb_participants
+  nb_participants,
+  my_rp_key = null
 ) => {
   try {
     const db = getDb();
     await db.runAsync(
       `INSERT INTO race_event
-      (re_id, re_user_id, re_event_name, re_event_visibility, re_event_start_date_and_time, re_event_end_date_and_time, re_event_random_id_edit, re_event_random_id_viewer, re_viewport_latitude, re_viewport_longitude, re_viewport_zoom, re_viewport_opacity, re_maplayer, re_marker_timeout, re_tail_timeout, re_flag_content, nb_participants) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [re_id, re_user_id, re_event_name, re_event_visibility, re_event_start_date_and_time, re_event_end_date_and_time, re_event_random_id_edit, re_event_random_id_viewer, re_viewport_latitude, re_viewport_longitude, re_viewport_zoom, re_viewport_opacity, re_maplayer, re_marker_timeout, re_tail_timeout, re_flag_content, nb_participants]
+      (re_id, re_user_id, re_event_name, re_event_visibility, re_event_start_date_and_time, re_event_end_date_and_time, re_event_random_id_edit, re_event_random_id_viewer, re_viewport_latitude, re_viewport_longitude, re_viewport_zoom, re_viewport_opacity, re_maplayer, re_marker_timeout, re_tail_timeout, re_flag_content, nb_participants, my_rp_key) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [re_id, re_user_id, re_event_name, re_event_visibility, re_event_start_date_and_time, re_event_end_date_and_time, re_event_random_id_edit, re_event_random_id_viewer, re_viewport_latitude, re_viewport_longitude, re_viewport_zoom, re_viewport_opacity, re_maplayer, re_marker_timeout, re_tail_timeout, re_flag_content, nb_participants, my_rp_key]
     );
 
     console.log("Race event added:", re_id);
@@ -134,6 +137,7 @@ export const getRaceEventById = async (re_id) => {
  * @param {number} re_tail_timeout Le nouveau délai d'expiration des traces en secondes.
  * @param {number} re_flag_content Le nouveau contenu du drapeau de l'événement.
  * @param {number} nb_participants Le nouveau nombre de participants à l'événement.
+ * @param {string|null} my_rp_key La clé de participant associée à l'événement (optionnel, par défaut null).
  * @returns {Promise<void>} Une promesse qui se résout lorsque l'événement est mis à jour.
  */
 export const updateRaceEvent = async (
@@ -152,13 +156,14 @@ export const updateRaceEvent = async (
   re_marker_timeout,
   re_tail_timeout,
   re_flag_content,
-  nb_participants
+  nb_participants,
+  my_rp_key = null
 ) => {
   try {
     const db = getDb();
     await db.runAsync(
-      `UPDATE race_event SET re_event_name = ?, re_event_visibility = ?, re_event_start_date_and_time = ?, re_event_end_date_and_time = ?, re_event_random_id_edit = ?, re_event_random_id_viewer = ?, re_viewport_latitude = ?, re_viewport_longitude = ?, re_viewport_zoom = ?, re_viewport_opacity = ?, re_maplayer = ?, re_marker_timeout = ?, re_tail_timeout = ?, re_flag_content = ?, nb_participants = ? WHERE re_id = ?`,
-      [re_event_name, re_event_visibility, re_event_start_date_and_time, re_event_end_date_and_time, re_event_random_id_edit, re_event_random_id_viewer, re_viewport_latitude, re_viewport_longitude, re_viewport_zoom, re_viewport_opacity, re_maplayer, re_marker_timeout, re_tail_timeout, re_flag_content, nb_participants, re_id]
+      `UPDATE race_event SET re_event_name = ?, re_event_visibility = ?, re_event_start_date_and_time = ?, re_event_end_date_and_time = ?, re_event_random_id_edit = ?, re_event_random_id_viewer = ?, re_viewport_latitude = ?, re_viewport_longitude = ?, re_viewport_zoom = ?, re_viewport_opacity = ?, re_maplayer = ?, re_marker_timeout = ?, re_tail_timeout = ?, re_flag_content = ?, nb_participants = ?, my_rp_key = ? WHERE re_id = ?`,
+      [re_event_name, re_event_visibility, re_event_start_date_and_time, re_event_end_date_and_time, re_event_random_id_edit, re_event_random_id_viewer, re_viewport_latitude, re_viewport_longitude, re_viewport_zoom, re_viewport_opacity, re_maplayer, re_marker_timeout, re_tail_timeout, re_flag_content, nb_participants, my_rp_key, re_id]
     );
   } catch (error) {
     console.error("Error updating race event:", error);

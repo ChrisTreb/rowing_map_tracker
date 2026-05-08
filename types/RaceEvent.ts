@@ -27,4 +27,6 @@ export type RaceEvent = {
 
   rc_name: string;
   rc_nickname: string;
+
+  my_rp_key: string | null;
 };

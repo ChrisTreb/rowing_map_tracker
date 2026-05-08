@@ -80,7 +80,8 @@ export const initDb = async () => {
         re_marker_timeout INTEGER NOT NULL DEFAULT 180,
 	      re_tail_timeout INTEGER NOT NULL DEFAULT 180,
 	      re_flag_content INTEGER NOT NULL DEFAULT 0,
-        nb_participants INTEGER NOT NULL DEFAULT 0
+        nb_participants INTEGER NOT NULL DEFAULT 0,
+        my_rp_key TEXT NULL
       );
 
       CREATE TABLE IF NOT EXISTS race_event_track (
@@ -112,7 +113,9 @@ export const initDb = async () => {
 
       CREATE TABLE IF NOT EXISTS phone_rp_keys (
         prk_id INTEGER NOT NULL PRIMARY KEY,
-        prk_rp_key TEXT NOT NULL UNIQUE
+        prk_rp_key TEXT NOT NULL UNIQUE,
+        re_id INTEGER NOT NULL,
+        re_event_end_date_and_time INTEGER NOT NULL
       );
     `);
     // ... end of existing schema definition ...
