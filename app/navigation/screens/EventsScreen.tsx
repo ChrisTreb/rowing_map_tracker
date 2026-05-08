@@ -20,13 +20,8 @@ const EventsScreen = () => {
     try {
       const apiURL = process.env.EXPO_PUBLIC_API_URL;
 
-      const response = await fetch(`${apiURL}/raceevents`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Api-Key": `${participantCode}`,
-        },
-      });
+      const response = await fetch(`${apiURL}/raceevents/forkeys/${participantCode}`);
+
       const data = await response.json();
       const responseStatus = response.status;
 
