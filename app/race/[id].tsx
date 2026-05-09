@@ -1,8 +1,8 @@
-import { addRaceParticipant, getRaceEventById, getRaceParticipantById } from '@/services/database';
+import { addRaceParticipant, getRaceEventById, getRaceParticipantById, updateRaceParticipant } from '@/services/database';
 import { DbPhoneRpKey, getPhoneRpKeysByRaceEventId } from '@/services/phoneKeys';
 import { DbRaceEvent } from "@/services/raceEvent";
 import { DbRaceParticipant, getRaceParticipantsByEventId } from '@/services/raceParticipant';
-import { Participant } from '@/types/Participant';
+import { EventRacesWithParticipants } from '@/types/EventRacesWithParticipants';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from 'react-native';
@@ -12,36 +12,39 @@ export default function RaceScreen() {
   // Récupérez le paramètre de recherche local pour obtenir l'ID de l'événement de course
   const { id } = useLocalSearchParams();
 
+  const [eventRacesWithParticipants, setEventRacesWithParticipants] = useState<EventRacesWithParticipants | null>(null);
   const [raceEvent, setRaceEvent] = useState<DbRaceEvent | null>(null);
   const [dbRaceParticipants, setDbRaceParticipants] = useState<DbRaceParticipant[]>([]);
   const [phoneRpKeys, setPhoneRpKeys] = useState<DbPhoneRpKey[]>([]);
 
   const apiURL = process.env.EXPO_PUBLIC_API_URL;
+  const apiKey = process.env.EXPO_PUBLIC_API_KEY;
 
   const getRaceParticipantsApi = async (eventId: number) => {
     try {
 
-      const response = await fetch(`${apiURL}/api/v1/participants/re_id/${eventId}`, {
+      const response = await fetch(`${apiURL}/participants/re_id/${eventId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Api-Key': process.env.EXPO_PUBLIC_API_KEY || '',
+          'Api-Key': apiKey ? apiKey : '',
         },
       });
 
-      const participantsData: Participant[] = await response.json();
+      const eventData: EventRacesWithParticipants = await response.json();
 
-      console.log('Participants fetched from API:', participantsData);
+      console.log('Event data fetched from API:', eventData);
 
       // Insertion des participants dans la base de données locale
-      await Promise.all(participantsData.map(async (participant) => {
+      eventData.participants.map(async (participant) => {
+        console.log('Processing participant:', participant);
         // Si le participant n'existe pas déjà dans la base de données locale, l'ajouter
-        if (getRaceParticipantById(participant.rp_id) === null) {
+        if (await getRaceParticipantById(participant.rp_id) === null) {
 
           await addRaceParticipant(
             participant.rp_id,
             participant.rp_ra_id,
-            id ? parseInt(id as string) : null,
+            parseInt(id as string),
             participant.rp_bib,
             participant.rp_name,
             participant.rp_color,
@@ -51,10 +54,10 @@ export default function RaceScreen() {
         } else {
           // Mettre à jour le participant existant dans la base de données locale
           try {
-            await addRaceParticipant(
+            await updateRaceParticipant(
               participant.rp_id,
+              parseInt(id as string),
               participant.rp_ra_id,
-              id ? parseInt(id as string) : null,
               participant.rp_bib,
               participant.rp_name,
               participant.rp_color,
@@ -65,7 +68,7 @@ export default function RaceScreen() {
             console.error(`Error updating participant with ID ${participant.rp_id}:`, error);
           }
         }
-      }));
+      });
 
     } catch (error) {
       console.error('Error fetching race participants:', error);
@@ -83,7 +86,7 @@ export default function RaceScreen() {
   }
 
   useEffect(() => {
-    const getPageData = async () => {
+    const getEventData = async () => {
       // Récupérez les détails de l'événement de course depuis la base de données locale
       await getRaceEventById(parseInt(id as string)).then((event: DbRaceEvent | null) => {
         setRaceEvent(event);
@@ -94,12 +97,13 @@ export default function RaceScreen() {
 
       // Récupérez les participants de l'API et mettez à jour la base de données locale
       await getRaceParticipantsApi(parseInt(id as string)).catch((error) => {
+        console.log('Event ID for fetching participants from API:', id);
         console.error('Error fetching race participants from API:', error);
       }).then(async () => {
         // Après avoir récupéré les participants de l'API, récupérez-les à nouveau depuis la base de données locale pour les afficher
         const localParticipants = await getRaceParticipantsByEventId(parseInt(id as string));
         setDbRaceParticipants(localParticipants);
-        console.log('Participants récupérés depuis la base de données locale:', dbRaceParticipants);
+        console.log('Participants récupérés depuis la base de données locale:', localParticipants);
       }).catch((error) => {
         console.error('Error fetching race participants from local database:', error);
       }).then(async () => {
@@ -111,7 +115,7 @@ export default function RaceScreen() {
       });
     }
 
-    getPageData();
+    getEventData();
 
   }, []);
 
