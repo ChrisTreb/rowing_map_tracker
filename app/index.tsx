@@ -234,7 +234,7 @@ const Index = () => {
       />
       {/* Bouton déclencheur de la modale */}
       <Pressable style={styles.button} onPress={() => setIsModalVisible(true)}>
-        <Text style={styles.buttonText}>Entrez votre code</Text>
+        <Text style={styles.buttonText}><Ionicons name="grid" size={20} color="#ffffff" /> Entrez votre code</Text>
       </Pressable>
 
       {/* MODAL POUR ENTRER LE CODE PARTICIPANT */}
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#216161",
     padding: 15,
     borderRadius: 12,
     height: 60,
@@ -390,7 +390,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     fontSize: 36,
     fontWeight: 'bold',
-    marginBottom: 20,
   },
 
   closeButton: {
