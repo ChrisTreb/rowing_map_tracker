@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { initDb } from "../../../services/database";
@@ -10,6 +11,7 @@ import EventCard from "../../components/EventCard";
 const EventsScreen = () => {
   const [dbEvents, setDbEvents] = useState<DbRaceEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true); // État pour indiquer le chargement/la synchronisation
+  const [isCodeValid, setIsCodeValid] = useState(true); // État pour indiquer si le code participant est valide
 
   const [phoneRpKeys, setPhoneRpKeys] = useState<DbPhoneRpKey[]>([]);
 
@@ -27,17 +29,20 @@ const EventsScreen = () => {
       const response = await fetch(`${apiURL}/raceevents/forkeys/${participantCode}`);
 
       const data = await response.json();
-      const responseStatus = response.status;
-
-      console.log("API response status:", response.status);
-
-      if (responseStatus === 401) { // TODO : vérifier le code exact renvoyé par l'API pour un code invalide
-        Alert.alert("Code invalide", "Le code que vous avez entré est incorrect. Veuillez réessayer.");
-        return;
-      }
 
       // Préparer toutes les opérations d'insertion/mise à jour en parallèle
       const syncPromises = data.raceevents.map(async (event: RaceEvent) => {
+
+        // Si le code participant est fourni, vérifier s'il correspond à l'un des événements récupérés
+        if (participantCode.trim() !== "") {
+          const isCodeValidForEvent = data.raceevents.some((e: RaceEvent) => e.my_rp_key === participantCode);
+          if (!isCodeValidForEvent) {
+            console.warn(`Le code participant "${participantCode}" n'est associé à aucun événement récupéré. Ignoring this code for synchronization.`);
+            setIsCodeValid(false);
+          } else {
+            setIsCodeValid(true);
+          }
+        }
 
         // Validation de re_event_visibility (doit être 0 ou 1)
         const visibility = (event.re_event_visibility >= 0 && event.re_event_visibility <= 1) ? event.re_event_visibility : 1;
@@ -190,10 +195,12 @@ const EventsScreen = () => {
       await loadLocalRaceEvents();
       console.log("Local events loaded into state.");
 
-      // Fermer le modal après la soumission
-      setIsModalVisible(false);
-      // Réinitialiser le champ de saisie du code participant
-      setParticipantCode("");
+      setTimeout(() => {
+        // Réinitialiser l'état de validité du code à chaque soumission
+        setIsCodeValid(false);
+        // Réinitialiser le champ de saisie du code participant
+        setParticipantCode("");
+      }, 3000); // Délai pour permettre à l'utilisateur de voir les événements associés avant de réinitialiser le champ
 
       console.log("Participant code submitted and processed successfully. ", phoneRpKeys);
     } catch (error) {
@@ -244,23 +251,35 @@ const EventsScreen = () => {
             <Text style={styles.modalTitle}>Entrez votre code</Text>
 
             {/* Input du code */}
-            <TextInput
-              style={styles.inputCode}
-              placeholder="----"
-              value={participantCode}
-              onChangeText={(text) => setParticipantCode(text)}
-              autoCapitalize='characters'
-              maxLength={4}
-            />
+            {!isCodeValid && (
+              <TextInput
+                style={styles.inputCode}
+                placeholder="----"
+                value={participantCode}
+                onChangeText={(text) => setParticipantCode(text)}
+                autoCapitalize='characters'
+                maxLength={4}
+              />
+            )}
 
             {/* Bouton de soumission */}
-            <Pressable
-              style={[styles.button, { marginTop: 20 }]}
-              onPress={handleParticipantCodeSubmit}
-              disabled={!participantCode.trim()} // Désactiver si le champ est vide
-            >
-              <Text style={styles.buttonText}>Valider</Text>
-            </Pressable>
+            {!isCodeValid && (
+              <Pressable
+                style={[styles.button, { marginTop: 20 }]}
+                onPress={handleParticipantCodeSubmit}
+                disabled={!participantCode.trim()} // Désactiver si le champ est vide
+              >
+                <Text style={styles.buttonText}>Valider</Text>
+              </Pressable>
+            )}
+
+            {isCodeValid && (
+              <View style={{ alignItems: 'center' }}>
+                <Text><Ionicons name="checkmark-circle" size={80} color="#26ae11" /></Text>
+                <Text style={{ color: '#555', fontSize: 14, marginTop: 10, textAlign: 'center', marginBottom: 20 }}>Fermez ce message pour voir les événements associés à votre code.</Text>
+              </View>
+            )}
+
 
             {/* Bouton de fermeture */}
             <Pressable onPress={() => setIsModalVisible(false)}>
@@ -299,7 +318,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#007bff",
     padding: 15,
     borderRadius: 12,
-    height: 80,
+    height: 60,
     justifyContent: "center",
     alignItems: "center",
     margin: 10,
