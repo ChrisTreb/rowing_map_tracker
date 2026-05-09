@@ -1,8 +1,11 @@
 import { addRaceParticipant, getRaceEventById, getRaceParticipantById, updateRaceParticipant } from '@/services/database';
 import { DbPhoneRpKey, getPhoneRpKeysByRaceEventId } from '@/services/phoneKeys';
+import { addRace, DbRace, getRaceById, updateRace } from '@/services/race';
 import { DbRaceEvent } from "@/services/raceEvent";
 import { DbRaceParticipant, getRaceParticipantsByEventId } from '@/services/raceParticipant';
 import { EventRacesWithParticipants } from '@/types/EventRacesWithParticipants';
+import { Participant } from "@/types/Participant";
+import { Race } from "@/types/Race";
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from 'react-native';
@@ -14,6 +17,7 @@ export default function RaceScreen() {
 
   const [raceEvent, setRaceEvent] = useState<DbRaceEvent>({} as DbRaceEvent);
   const [dbRaceParticipants, setDbRaceParticipants] = useState<DbRaceParticipant[]>([]);
+  const [dbRaces, setDbRaces] = useState<DbRace[]>([])
   const [phoneRpKeys, setPhoneRpKeys] = useState<DbPhoneRpKey[]>([]);
 
   const apiURL = process.env.EXPO_PUBLIC_API_URL;
@@ -34,8 +38,30 @@ export default function RaceScreen() {
 
       console.log('Event data fetched from API:', eventData);
 
+      // Insertion des courses dans la base de données locale
+      eventData.races.map(async (race: Race) => {
+        console.log('Processing race:', race);
+        // Si la course n'existe pas déjà dans la base de données locale, l'ajouter
+        if (await getRaceById(race.ra_id) === null) {
+
+          await addRace(
+            race.ra_id,
+            race.ra_re_id,
+            race.ra_type,
+            race.ra_name
+          );
+        } else {
+          await updateRace(
+            race.ra_id,
+            race.ra_re_id,
+            race.ra_type,
+            race.ra_name
+          );
+        }
+      });
+
       // Insertion des participants dans la base de données locale
-      eventData.participants.map(async (participant) => {
+      eventData.participants.map(async (participant: Participant) => {
         console.log('Processing participant:', participant);
         // Si le participant n'existe pas déjà dans la base de données locale, l'ajouter
         if (await getRaceParticipantById(participant.rp_id) === null) {
@@ -52,7 +78,6 @@ export default function RaceScreen() {
           );
         } else {
           // Mettre à jour le participant existant dans la base de données locale
-          try {
             await updateRaceParticipant(
               participant.rp_id,
               parseInt(id as string),
@@ -63,9 +88,6 @@ export default function RaceScreen() {
               participant.rp_key,
               participant.rp_updated_at
             );
-          } catch (error) {
-            console.error(`Error updating participant with ID ${participant.rp_id}:`, error);
-          }
         }
       });
 
@@ -118,7 +140,7 @@ export default function RaceScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>{raceEvent.re_event_name}</Text>
+      <Text style={styles.title}>{raceEvent.re_event_name}</Text>
       {dbRaceParticipants.map((participant) => (
         <View key={participant.rp_id} style={{ marginVertical: 5 }}>
           {participant.rp_name && <Text style={styles.text}>Name: {participant.rp_name}</Text>}
@@ -133,12 +155,16 @@ export default function RaceScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#25292e',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 10,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
   },
   text: {
-    color: '#fff',
+    color: '#0A0F0E',
     fontSize: 18,
     marginVertical: 5,
   },

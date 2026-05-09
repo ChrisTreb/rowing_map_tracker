@@ -300,7 +300,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingVertical: 40, 
   },
-
   card: {
     backgroundColor: "#f5f7ff",
     padding: 15,
@@ -308,18 +307,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     elevation: 2,
   },
-
   title: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 5,
   },
-
   text: {
     fontSize: 13,
     color: "#555",
   },
-
   button: {
     backgroundColor: "#216161",
     padding: 15,
@@ -329,7 +325,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     margin: 10,
   },
-
   buttonText: {
     minWidth: 200,
     width: "100%",
@@ -338,7 +333,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
-
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -351,7 +345,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#555',
   },
-
   // Styles pour la Modale
   centeredView: {
     flex: 1,
@@ -359,7 +352,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)', // Fond semi-transparent
   },
-
   modalView: {
     margin: 20,
     backgroundColor: 'white',
@@ -372,14 +364,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 30,
     color: '#333',
   },
-
   inputCode: {
     textAlign: 'center',
     width: 150,
@@ -391,7 +381,6 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: 'bold',
   },
-
   closeButton: {
     borderWidth: 1,
     borderColor: '#999',
