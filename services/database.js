@@ -96,6 +96,7 @@ export const initDb = async () => {
       CREATE TABLE IF NOT EXISTS race_participant (
         rp_id INTEGER NOT NULL PRIMARY KEY,
         rp_ra_id INTEGER NOT NULL REFERENCES race(ra_id) ON DELETE CASCADE,
+        rp_re_id INTEGER REFERENCES race_event(re_id) ON DELETE SET NULL,
         rp_bib TEXT,
         rp_name TEXT,
         rp_color TEXT,
