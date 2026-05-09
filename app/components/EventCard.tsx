@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Link } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { DbPhoneRpKey, getPhoneRpKeysByRaceEventId } from "../../services/phoneKeys";
@@ -48,6 +49,10 @@ const EventCard = ({ event }: EventCardProps) => {
         </Text>
       )}
       {keysLoading && <ActivityIndicator size="small" color="#007bff" />}
+      {/* Construisez le href pour inclure l'ID de l'événement */}
+      <Link href={{ pathname: "/race/[id]", params: { id: event.re_id } }} style={{ marginTop: 10 }}>
+        <Text style={{ color: "#007bff" }}>Voir les courses</Text>
+      </Link>
     </View>
   );
 };
@@ -62,12 +67,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
     marginBottom: 5,
   },
   text: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#555",
   },
 });
