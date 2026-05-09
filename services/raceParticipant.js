@@ -41,7 +41,7 @@ export const addRaceParticipant = async (
       `INSERT INTO race_participant (rp_id, rp_ra_id, rp_re_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [rp_id, rp_ra_id, rp_re_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at]
     );
-    console.log("Race participant added, name:", rp_name);
+    console.log("Race participant added, id:", rp_id);
     return rp_id;
   } catch (error) {
     console.error("Error adding race participant:", error);
@@ -125,7 +125,7 @@ export const updateRaceParticipant = async (rp_id, rp_re_id, rp_ra_id, rp_bib, r
       `UPDATE race_participant SET rp_re_id = ?, rp_ra_id = ?, rp_bib = ?, rp_name = ?, rp_color = ?, rp_key = ?, rp_updated_at = ? WHERE rp_id = ?`,
       [rp_re_id, rp_ra_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at, rp_id]
     );
-    console.log("Race participant updated, name:", rp_name);
+    console.log("Race participant updated, id:", rp_id);
   } catch (error) {
     console.error("Error updating race participant:", error);
     throw error;

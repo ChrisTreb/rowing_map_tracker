@@ -12,8 +12,7 @@ export default function RaceScreen() {
   // Récupérez le paramètre de recherche local pour obtenir l'ID de l'événement de course
   const { id } = useLocalSearchParams();
 
-  const [eventRacesWithParticipants, setEventRacesWithParticipants] = useState<EventRacesWithParticipants | null>(null);
-  const [raceEvent, setRaceEvent] = useState<DbRaceEvent | null>(null);
+  const [raceEvent, setRaceEvent] = useState<DbRaceEvent>({} as DbRaceEvent);
   const [dbRaceParticipants, setDbRaceParticipants] = useState<DbRaceParticipant[]>([]);
   const [phoneRpKeys, setPhoneRpKeys] = useState<DbPhoneRpKey[]>([]);
 
@@ -89,7 +88,7 @@ export default function RaceScreen() {
     const getEventData = async () => {
       // Récupérez les détails de l'événement de course depuis la base de données locale
       await getRaceEventById(parseInt(id as string)).then((event: DbRaceEvent | null) => {
-        setRaceEvent(event);
+        setRaceEvent(event as DbRaceEvent);
         console.log('Race event retrieved from local database:', raceEvent);
       }).catch((error) => {
         console.error('Error fetching race event from database:', error);
@@ -97,18 +96,16 @@ export default function RaceScreen() {
 
       // Récupérez les participants de l'API et mettez à jour la base de données locale
       await getRaceParticipantsApi(parseInt(id as string)).catch((error) => {
-        console.log('Event ID for fetching participants from API:', id);
         console.error('Error fetching race participants from API:', error);
       }).then(async () => {
         // Après avoir récupéré les participants de l'API, récupérez-les à nouveau depuis la base de données locale pour les afficher
         const localParticipants = await getRaceParticipantsByEventId(parseInt(id as string));
         setDbRaceParticipants(localParticipants);
         console.log('Participants récupérés depuis la base de données locale:', localParticipants);
-      }).catch((error) => {
-        console.error('Error fetching race participants from local database:', error);
       }).then(async () => {
         // Récupérez les clés des participants de la base de données locale pour les utiliser dans l'application
         await getPhoneRpKeys(parseInt(id as string));
+        setPhoneRpKeys(phoneRpKeys);
         console.log('Fetching phone RP keys from local database for event ID:', phoneRpKeys);
       }).catch((error) => {
         console.error('Error fetching phone RP keys from local database:', error);
@@ -121,8 +118,14 @@ export default function RaceScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Race screen</Text>
-      {id && <Text style={styles.text}>ID de l'événement: {id}</Text>}
+      <Text style={styles.text}>{raceEvent.re_event_name}</Text>
+      {dbRaceParticipants.map((participant) => (
+        <View key={participant.rp_id} style={{ marginVertical: 5 }}>
+          {participant.rp_name && <Text style={styles.text}>Name: {participant.rp_name}</Text>}
+          {participant.rp_bib && <Text style={styles.text}>Bib: {participant.rp_bib}</Text>}
+          {participant.rp_color && <Text style={styles.text}>Color: {participant.rp_color}</Text>}
+        </View>
+      ))}
     </View>
   );
 }
