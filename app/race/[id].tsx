@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router'; // Importez useLocalSearchParams
+import { useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 export default function RaceScreen() {
@@ -21,7 +21,7 @@ const styles = StyleSheet.create({
     },
     text: {
         color: '#fff',
-        fontSize: 18, // Augmenter la taille pour une meilleure visibilité
+        fontSize: 18,
         marginVertical: 5,
     },
 });
