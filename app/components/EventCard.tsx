@@ -62,12 +62,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
     marginBottom: 5,
   },
   text: {
-    fontSize: 13,
+    fontSize: 16,
     color: "#555",
   },
 });
