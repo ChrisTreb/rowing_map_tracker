@@ -18,15 +18,14 @@ export const getDb = () => {
 };
 
 /**
- * Initialise la base de données en ouvrant une connexion et en créant les tables si elles n'existent pas.
- * @returns {Promise<void>} Une promesse qui se résout lorsque la base de données est initialisée.
+ * Supprime les tables dans la base de données locale
+ * @param {SQLite.SQLiteDatabase | null} db Base de données locale
+ * @returns {Promise<void>} Une promesse qui se résout lorsque les tables sont supprimées.
  */
-export const initDb = async () => {
+export const dropAllTables = async (db) => {
   try {
-    db = await SQLite.openDatabaseAsync("rowing_tracker.db");
-
-    // ... existing schema definition ...
-    await db.execAsync(`
+    if (db != null) {
+      await db.execAsync(`
       DROP TABLE IF EXISTS race_participant_position;
       DROP TABLE IF EXISTS race_participant;
       DROP TABLE IF EXISTS race;
@@ -36,7 +35,25 @@ export const initDb = async () => {
       DROP TABLE IF EXISTS user;
       DROP TABLE IF EXISTS rowing_club;
       DROP TABLE IF EXISTS phone_rp_keys;
+    `);
+    }
 
+    console.log("All tables dropped with success !");
+  } catch (error) {
+    console.error("Error dropping all tables:", error);
+  }
+}
+
+/**
+ * Initialise la base de données en ouvrant une connexion et en créant les tables si elles n'existent pas.
+ * @returns {Promise<void>} Une promesse qui se résout lorsque la base de données est initialisée.
+ */
+export const initDb = async () => {
+  try {
+    db = await SQLite.openDatabaseAsync("rowing_tracker.db");
+
+    // ... existing schema definition ...
+    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS race (
         ra_id INTEGER NOT NULL PRIMARY KEY,
         ra_re_id INTEGER NOT NULL REFERENCES race_event(re_id) ON DELETE CASCADE,
@@ -96,7 +113,7 @@ export const initDb = async () => {
       CREATE TABLE IF NOT EXISTS race_participant (
         rp_id INTEGER NOT NULL PRIMARY KEY,
         rp_ra_id INTEGER NOT NULL REFERENCES race(ra_id) ON DELETE CASCADE,
-        rp_re_id INTEGER REFERENCES race_event(re_id) ON DELETE SET NULL,
+        rp_re_id INTEGER NOT NULL,
         rp_bib TEXT,
         rp_name TEXT,
         rp_color TEXT,

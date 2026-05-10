@@ -51,15 +51,15 @@ export const addRaceParticipant = async (
 
 /**
  * Récupère tous les participant d'un événement de course par l'ID de l'événement.
- * @param {number} re_id L'ID de l'événement de course.
+ * @param {number} rp_re_id L'ID de l'événement de course.
  * @returns {Promise<DbRaceParticipant[] | null>} Un tableau d'objets DbRaceParticipant.
  */
-export const getRaceParticipantsByEventId = async (re_id) => {
+export const getRaceParticipantsByEventId = async (rp_re_id) => {
   try {
     const db = getDb();
     const result = await db.getAllAsync(
       `SELECT * FROM race_participant WHERE rp_re_id = ?`,
-      [re_id]
+      [rp_re_id]
     );
     return /** @type {DbRaceParticipant[] | null} */ (result);
   } catch (error) {
@@ -118,7 +118,16 @@ export const getRaceParticipantById = async (rp_id) => {
  * @param {number | null} rp_updated_at Le nouveau timestamp de mise à jour.
  * @returns {Promise<void>} Une promesse qui se résout lorsque le participant est mis à jour.
  */
-export const updateRaceParticipant = async (rp_id, rp_re_id, rp_ra_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at) => {
+export const updateRaceParticipant = async (
+  rp_id,
+  rp_ra_id,
+  rp_re_id,
+  rp_bib,
+  rp_name,
+  rp_color,
+  rp_key,
+  rp_updated_at
+) => {
   try {
     const db = getDb();
     await db.runAsync(
