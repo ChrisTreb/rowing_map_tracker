@@ -1,6 +1,6 @@
 import { addRaceParticipant, getRaceEventById, getRaceParticipantById, updateRaceParticipant } from '@/services/database';
 import { DbPhoneRpKey, getPhoneRpKeysByRaceEventId } from '@/services/phoneKeys';
-import { addRace, DbRace, getRaceById, updateRace } from '@/services/race';
+import { addRace, DbRace, getRaceById, getRacesByEventId, updateRace } from '@/services/race';
 import { DbRaceEvent } from "@/services/raceEvent";
 import { DbRaceParticipant, getRaceParticipantsByEventId } from '@/services/raceParticipant';
 import { EventRacesWithParticipants } from '@/types/EventRacesWithParticipants';
@@ -51,6 +51,7 @@ export default function RaceScreen() {
             race.ra_name
           );
         } else {
+          // Mise à jour systématique en base des données récupérées depuis l'API
           await updateRace(
             race.ra_id,
             race.ra_re_id,
@@ -124,6 +125,9 @@ export default function RaceScreen() {
         const localParticipants = await getRaceParticipantsByEventId(parseInt(id as string));
         setDbRaceParticipants(localParticipants);
         console.log('Participants récupérés depuis la base de données locale:', localParticipants);
+      }).then(async () => {
+        const localRaces = await getRacesByEventId(parseInt(id as string));
+        console.log('Courses récupérées depuis la base de données locale:', localRaces);
       }).then(async () => {
         // Récupérez les clés des participants de la base de données locale pour les utiliser dans l'application
         await getPhoneRpKeys(parseInt(id as string));

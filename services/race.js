@@ -82,6 +82,25 @@ export const getRaceById = async (ra_id) => {
 };
 
 /**
+ * Récupère les courses par l'ID de l'événement.
+ * @param {number} ra_re_id L'ID de l'événement de course associé.
+ * @returns {Promise<DbRace[] | null>} L'objet DbRace ou null si non trouvé.
+ */
+export const getRacesByEventId = async (ra_re_id) => {
+  try {
+    const db = getDb();
+    const result = await db.getAllAsync(
+      `SELECT * FROM race WHERE ra_re_id = ?`,
+      [ra_re_id]
+    );
+    return /** @type {DbRace[] | null} */ (result); // Cast pour assurer le type
+  } catch (error) {
+    console.error("Error fetching race by event ID:", error);
+    throw error;
+  }
+};
+
+/**
  * Met à jour une course existante
  * @param {number} ra_id L'ID de la course, généré en externe.
  * @param {number} ra_re_id L'ID de l'événement de course associé.
