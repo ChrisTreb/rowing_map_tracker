@@ -5,9 +5,10 @@ import { addRaceParticipant, DbRaceParticipant, getRaceParticipantById, getRaceP
 import { EventRacesWithParticipants } from '@/types/EventRacesWithParticipants';
 import { Participant } from "@/types/Participant";
 import { Race } from "@/types/Race";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
 
 export default function RaceScreen() {
@@ -159,7 +160,7 @@ export default function RaceScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007bff" />
-        <Text style={styles.loadingText}>Chargement des détails de la course...</Text>
+        <Text style={styles.loadingText}>Chargement des détails de l'événement...</Text>
       </View>
     );
   }
@@ -167,42 +168,48 @@ export default function RaceScreen() {
   return (
     <View style={styles.container}>
       {raceEvent ? (
-        <Text style={styles.title}>{raceEvent.re_event_name}</Text>
+        <Text style={styles.pageTitle}>{raceEvent.re_event_name}</Text>
       ) : (
         <Text style={styles.title}>Détails de l'événement introuvables</Text>
       )}
 
-      {dbRaceParticipants &&
-        <Text style={styles.subtitle}>Participants ({dbRaceParticipants.length})</Text>
-      }
-      {dbRaceParticipants != null ? dbRaceParticipants.map((participant) => (
-        <View key={participant.rp_id} style={styles.dataCard}>
-          <Text style={styles.dataText}>Course ID: {participant.rp_ra_id}</Text>
-          <Text style={styles.dataText}>Nom: {participant.rp_name}</Text>
-          <Text style={styles.dataText}>Clé: {participant.rp_key}</Text>
-          <Text style={styles.dataText}>Couleur: {participant.rp_color}</Text>
-        </View>
-      )) : <Text style={styles.noDataText}>Aucun participant trouvé.</Text>}
+      <View style={styles.eventDataContainer}>
+        {/* Affichage du nombre de participants et courses */}
+        {dbRaceParticipants && dbRaceParticipants.length > 0 &&
+          <Text style={styles.eventData}><Ionicons name="people" size={20} /> {dbRaceParticipants.length} Participants</Text>
+        }
+        {dbRaces && dbRaces.length > 0 &&
+          <Text style={styles.eventData}><Ionicons name="flag" size={20} /> {dbRaces.length} Courses</Text>
+        }
+      </View>
 
-      {dbRaces &&
-        <Text style={styles.subtitle}>Courses de l'événement ({dbRaces.length})</Text>
-      }
-      {dbRaces != null ? dbRaces.map((race) => (
-        <View key={race.ra_id} style={styles.dataCard}>
-          <Text style={styles.dataText}>Nom: {race.ra_name}</Text>
-          <Text style={styles.dataText}>Type: {race.ra_type}</Text>
-        </View>
-      )) : <Text style={styles.noDataText}>Aucune course trouvée.</Text>}
 
-      {dbPhoneRpKeys &&
-        <Text style={styles.subtitle}>Clés RP locales ({dbPhoneRpKeys.length})</Text>
-      }
-      {dbPhoneRpKeys != null ? dbPhoneRpKeys.map((key) => (
-        <View key={key.prk_id} style={styles.dataCard}>
-          <Text style={styles.dataText}>Clé: {key.prk_rp_key}</Text>
-          <Text style={styles.dataText}>Fin validité: {new Date(key.re_event_end_date_and_time).toLocaleString()}</Text>
-        </View>
-      )) : <Text style={styles.noDataText}>Aucune clé RP trouvée.</Text>}
+      {/* FlatList principale pour les courses */}
+      <FlatList
+        data={dbRaces}
+        keyExtractor={(item) => item.ra_id.toString()}
+        ListEmptyComponent={<Text style={styles.noDataText}>Aucune course trouvée.</Text>}
+        renderItem={({ item: race }) => (
+          <View style={styles.dataCard}>
+            <Text style={styles.dataText}>Nom de la course: {race.ra_name}</Text>
+            <Text style={styles.dataText}>Type: {race.ra_type}</Text>
+
+            <Text style={styles.participantListTitle}>Participants:</Text>
+            {/* FlatList imbriquée pour les participants de cette course */}
+            <FlatList
+              data={dbRaceParticipants?.filter(p => p.rp_ra_id === race.ra_id) || []}
+              keyExtractor={(item) => item.rp_id.toString()}
+              ListEmptyComponent={<Text style={styles.noDataText}><Ionicons name="information-circle" size={20} /> Aucun participant pour cette course.</Text>}
+              renderItem={({ item: participant }) => (
+                <View style={styles.participantItem}>
+                  <Text style={styles.participantText}><Ionicons name="boat" size={20} /> Bib: {participant.rp_bib}</Text>
+                  <Text style={styles.participantText}><Ionicons name="person-circle" size={20} /> Nom: {participant.rp_name}</Text>
+                </View>
+              )}
+            />
+          </View>
+        )}
+      />
     </View>
   );
 }
@@ -210,22 +217,37 @@ export default function RaceScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f2f5',
+    backgroundColor: '#E3E5E7',
     paddingVertical: 40,
     paddingHorizontal: 15,
-    overflow: "scroll",
+  },
+  pageTitle: {
+    textAlign: "center",
+    marginHorizontal: 15,
+    padding: 15,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    backgroundColor: "#7594A8",
+    color: "#f5f7ff",
+    borderRadius: 8,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#ffffff',
     textAlign: 'center',
   },
-  subtitle: {
-    fontSize: 18,
+  eventDataContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  eventData: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#555',
-    marginTop: 20,
+    color: '#216161',
+    marginTop: 10,
     marginBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -264,5 +286,34 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 18,
     color: '#555',
+  },
+  // Nouveaux styles pour les participants
+  participantListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#216161',
+    marginTop: 15,
+    marginBottom: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#ccc',
+    paddingBottom: 5,
+  },
+  participantItem: {
+    backgroundColor: '#f0f4f7',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#7594A8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  participantText: {
+    fontSize: 13,
+    color: '#444',
+    marginBottom: 2,
   },
 });

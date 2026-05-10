@@ -226,6 +226,7 @@ const Index = () => {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.pageTitle}>Événements</Text>
       <FlatList
         data={dbEvents}
         keyExtractor={(item) => item.re_id.toString()}
@@ -250,7 +251,8 @@ const Index = () => {
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
             {/* Titre */}
-            <Text style={styles.modalTitle}>Entrez votre code</Text>
+            <Text style={styles.modalTitle}>Code participant</Text>
+            <Text style={styles.text}>Entrez votre code participant de 4 caractères</Text>
 
             {/* Input du code */}
             {!isCodeValid && (
@@ -297,14 +299,30 @@ const Index = () => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1,
-    backgroundColor: "#fff",
-    paddingVertical: 40, 
+    backgroundColor: "#E3E5E7",
+    paddingVertical: 40,
+    paddingHorizontal: 15,
+  },
+  pageTitle: {
+    textAlign: "center",
+    marginHorizontal: 15,
+    padding: 15,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    backgroundColor: "#7594A8",
+    color: "#f5f7ff",
+    borderRadius: 8,
   },
   card: {
     backgroundColor: "#f5f7ff",
     padding: 15,
     borderRadius: 12,
     marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     elevation: 2,
   },
   title: {
@@ -324,6 +342,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     margin: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   buttonText: {
     minWidth: 200,
@@ -332,6 +355,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   loadingContainer: {
     flex: 1,
@@ -364,12 +392,18 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalTitle: {
+    width: 300,
+    textAlign: 'center',
+    padding: 15,
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 30,
-    color: '#333',
+    marginBottom: 15,
+    color: '#f2f2f2',
+    backgroundColor: '#7594A8',
+    borderRadius: 8,
   },
   inputCode: {
+    marginTop: 15,
     textAlign: 'center',
     width: 150,
     height: 80,
