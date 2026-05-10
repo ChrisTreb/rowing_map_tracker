@@ -31,7 +31,7 @@ export const addPhoneRpKey = async (rp_key, re_id, re_event_end_date_and_time) =
 
 /**
  * Retrieves all phone RP keys from the database.
- * @returns {Promise<DbPhoneRpKey[]>} A promise that resolves to an array of phone RP keys.
+ * @returns {Promise<DbPhoneRpKey[] | null>} A promise that resolves to an array of phone RP keys.
  */
 export const getPhoneRpKeys = async () => {
     try {
@@ -99,7 +99,7 @@ export const updatePhoneRpKey = async (re_id, re_event_end_date_and_time, prk_rp
 /**
  * Retrieves keys associated with a specific race event ID.
  * @param {number} re_id - The ID of the race event.
- * @returns {Promise<DbPhoneRpKey[]>} A promise that resolves to an array of phone RP keys associated with the given race event ID.
+ * @returns {Promise<DbPhoneRpKey[] | null>} A promise that resolves to an array of phone RP keys associated with the given race event ID.
  */
 export const getPhoneRpKeysByRaceEventId = async (re_id) => {
     try {

@@ -52,7 +52,7 @@ export const addRaceParticipant = async (
 /**
  * Récupère tous les participant d'un événement de course par l'ID de l'événement.
  * @param {number} re_id L'ID de l'événement de course.
- * @returns {Promise<DbRaceParticipant[]>} Un tableau d'objets DbRaceParticipant.
+ * @returns {Promise<DbRaceParticipant[] | null>} Un tableau d'objets DbRaceParticipant.
  */
 export const getRaceParticipantsByEventId = async (re_id) => {
   try {
@@ -61,7 +61,7 @@ export const getRaceParticipantsByEventId = async (re_id) => {
       `SELECT * FROM race_participant WHERE rp_re_id = ?`,
       [re_id]
     );
-    return /** @type {DbRaceParticipant[]} */ (result);
+    return /** @type {DbRaceParticipant[] | null} */ (result);
   } catch (error) {
     console.error("Error fetching race participants by event ID:", error);
     throw error;
@@ -71,7 +71,7 @@ export const getRaceParticipantsByEventId = async (re_id) => {
 /**
  * Récupère tous les participants d'une course par l'ID de la course.
  * @param {number} ra_id L'ID de la course.
- * @returns {Promise<DbRaceParticipant[]>} Un tableau d'objets DbRaceParticipant.
+ * @returns {Promise<DbRaceParticipant[] | null>} Un tableau d'objets DbRaceParticipant.
  */
 export const getRaceParticipantsByRaceId = async (ra_id) => {
   try {
@@ -80,7 +80,7 @@ export const getRaceParticipantsByRaceId = async (ra_id) => {
       `SELECT * FROM race_participant WHERE rp_ra_id = ?`,
       [ra_id]
     );
-    return /** @type {DbRaceParticipant[]} */ (result);
+    return /** @type {DbRaceParticipant[] | null} */ (result);
   } catch (error) {
     console.error("Error fetching race participants by race ID:", error);
     throw error;

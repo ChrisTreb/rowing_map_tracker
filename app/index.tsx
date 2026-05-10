@@ -9,11 +9,11 @@ import EventCard from "./components/EventCard";
 
 
 const Index = () => {
-  const [dbEvents, setDbEvents] = useState<DbRaceEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true); // État pour indiquer le chargement/la synchronisation
   const [isCodeValid, setIsCodeValid] = useState(true); // État pour indiquer si le code participant est valide
 
-  const [phoneRpKeys, setPhoneRpKeys] = useState<DbPhoneRpKey[]>([]);
+  const [dbEvents, setDbEvents] = useState<DbRaceEvent[] | null>([]);
+  const [phoneRpKeys, setPhoneRpKeys] = useState<DbPhoneRpKey[] | null>([]);
 
   // État pour le contenu de l'input du code participant
   const [participantCode, setParticipantCode] = useState("");
@@ -97,7 +97,7 @@ const Index = () => {
           }
 
           // Ajouter la clé de participant à la table phone_rp_keys si elle n'existe pas déjà et si elle est valide
-          if (event.my_rp_key) {
+          if (event.my_rp_key && event.my_rp_key != null && event.my_rp_key.length === 4 && phoneRpKeys != null) {
             const existingKey = phoneRpKeys.find(key => key.prk_rp_key === event.my_rp_key);
             if (!existingKey) {
               await addPhoneRpKey(event.my_rp_key, event.re_id, event.re_event_end_date_and_time);
@@ -339,7 +339,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
-
   loadingText: {
     marginTop: 10,
     fontSize: 16,
