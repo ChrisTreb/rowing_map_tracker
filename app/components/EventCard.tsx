@@ -54,7 +54,7 @@ const EventCard = ({ event }: EventCardProps) => {
       <View style={styles.linkContainer}>
         {/* Construisez le href pour inclure l'ID de l'événement */}
         <Link href={{ pathname: "/event/[id]", params: { id: event.re_id } }} >
-          <Ionicons name="play" size={45} color="#E3E5E7" />
+          <Ionicons name="play-circle-outline" size={45} color="#E3E5E7" />
         </Link>
       </View>
     </View>

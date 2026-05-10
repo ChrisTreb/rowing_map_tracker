@@ -224,7 +224,7 @@ export default function RaceScreen() {
                   <Text style={styles.participantText}><Ionicons name="person-circle" size={20} /> Nom: {participant.rp_name}</Text>
                   {localKeys?.includes(participant.rp_key) &&
                     <Link href={{ pathname: "/tracker/[id]", params:{ id: participant.rp_ra_id } }} style={styles.trackerLink} >
-                      <Ionicons name="play" size={20} /> <Text>Accéder au tracker</Text> 
+                      <Ionicons name="play-circle-outline" size={20} /> <Text>Accéder au tracker</Text> 
                     </Link>
                   }
                 </View>
