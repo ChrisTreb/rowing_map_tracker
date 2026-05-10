@@ -6,7 +6,7 @@ import { EventRacesWithParticipants } from '@/types/EventRacesWithParticipants';
 import { Participant } from "@/types/Participant";
 import { Race } from "@/types/Race";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
@@ -21,6 +21,7 @@ export default function RaceScreen() {
   const [dbRaceParticipants, setDbRaceParticipants] = useState<DbRaceParticipant[] | null>([]);
   const [dbRaces, setDbRaces] = useState<DbRace[] | null>([]);
   const [dbPhoneRpKeys, setDbPhoneRpKeys] = useState<DbPhoneRpKey[] | null>([]);
+  const [localKeys, setLocalKeys] = useState<string[]>([]);
 
   const apiURL = process.env.EXPO_PUBLIC_API_URL;
   const apiKey = process.env.EXPO_PUBLIC_API_KEY;
@@ -121,9 +122,27 @@ export default function RaceScreen() {
       setDbPhoneRpKeys(localPhoneRpKeys);
       console.log('Phone RP Keys récupérées depuis la base de données locale:', localPhoneRpKeys);
 
+      if (localPhoneRpKeys) {
+        getLocalPhoneKeys(localPhoneRpKeys);
+      }
+
     } catch (error) {
       console.error('Error retrieving local data:', error);
       throw error;
+    }
+  }
+
+  // Transformer le tableau de DbPhoneRpKey[] en string[] contenant uniquement les clés
+  const getLocalPhoneKeys = (keys: DbPhoneRpKey[]) => {
+    if (keys != null) {
+      let keysArray: string[] = []
+      for (let index = 0; index < keys.length; index++) {
+        let key = keys[index].prk_rp_key;
+
+        keysArray.push(key);
+      }
+      setLocalKeys(keysArray);
+      console.log("Local keys array:", localKeys);
     }
   }
 
@@ -191,9 +210,7 @@ export default function RaceScreen() {
         ListEmptyComponent={<Text style={styles.noDataText}>Aucune course trouvée.</Text>}
         renderItem={({ item: race }) => (
           <View style={styles.dataCard}>
-            <Text style={styles.dataText}>Nom de la course: {race.ra_name}</Text>
-            <Text style={styles.dataText}>Type: {race.ra_type}</Text>
-
+            <Text style={styles.dataText}>Course: {race.ra_name}</Text>
             <Text style={styles.participantListTitle}>Participants:</Text>
             {/* FlatList imbriquée pour les participants de cette course */}
             <FlatList
@@ -204,6 +221,11 @@ export default function RaceScreen() {
                 <View style={styles.participantItem}>
                   <Text style={styles.participantText}><Ionicons name="boat" size={20} /> Bib: {participant.rp_bib}</Text>
                   <Text style={styles.participantText}><Ionicons name="person-circle" size={20} /> Nom: {participant.rp_name}</Text>
+                  {localKeys?.includes(participant.rp_key) &&
+                    <Link href={{ pathname: "/race/[id]" }} style={styles.trackerLink} >
+                      <Ionicons name="play" size={20} /> <Text>Accéder au tracker</Text> 
+                    </Link>
+                  }
                 </View>
               )}
             />
@@ -265,7 +287,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   dataText: {
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#333',
     marginBottom: 2,
   },
@@ -312,8 +335,23 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   participantText: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#444',
     marginBottom: 2,
   },
+  trackerLink: {
+    height: 60,
+    marginTop: 5,
+    paddingTop: 16,
+    paddingHorizontal: 15,
+    backgroundColor: '#216161',
+    color: '#f0f4f7',
+    fontSize: 18,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  }
 });

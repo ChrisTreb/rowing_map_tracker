@@ -11,7 +11,7 @@ interface EventCardProps {
 }
 
 const EventCard = ({ event }: EventCardProps) => {
-  const [associatedKeys, setAssociatedKeys] = useState<DbPhoneRpKey[]>([]);
+  const [associatedKeys, setAssociatedKeys] = useState<DbPhoneRpKey[] | null>([]);
   const [keysLoading, setKeysLoading] = useState(true);
 
   useEffect(() => {
@@ -30,7 +30,7 @@ const EventCard = ({ event }: EventCardProps) => {
     fetchKeys();
   }, [event.re_id]); // Re-déclencher si l'ID de l'événement change
 
-  const participantKeyView = associatedKeys.map(key => key.prk_rp_key).join(", ");
+  const participantKeyView = associatedKeys?.map(key => key.prk_rp_key).join(", ") ?? ""; 
 
   return (
     <View style={styles.card}>
@@ -44,7 +44,7 @@ const EventCard = ({ event }: EventCardProps) => {
           Fin: {formatDateTime(event.re_event_end_date_and_time)}
         </Text>
         {/* Afficher toutes les clés associées de la DB locale */}
-        {!keysLoading && associatedKeys.length > 0 && (
+        {!keysLoading && associatedKeys && associatedKeys.length > 0 && (
           <Text style={styles.text}>
             <Ionicons name="key" size={16} color="#2c2c2c" /> {participantKeyView}
           </Text>
@@ -53,7 +53,7 @@ const EventCard = ({ event }: EventCardProps) => {
       </View>
       <View style={styles.linkContainer}>
         {/* Construisez le href pour inclure l'ID de l'événement */}
-        <Link href={{ pathname: "/race/[id]", params: { id: event.re_id } }} >
+        <Link href={{ pathname: "/event/[id]", params: { id: event.re_id } }} >
           <Ionicons name="play" size={45} color="#E3E5E7" />
         </Link>
       </View>
@@ -92,6 +92,11 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });
 
