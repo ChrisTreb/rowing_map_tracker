@@ -193,6 +193,7 @@ export default function RaceScreen() {
       )}
 
       <View style={styles.eventDataContainer}>
+        <Link href={'/'}><Ionicons name="arrow-back" size={36} color={'#216161'} /></Link>
         {/* Affichage du nombre de participants et courses */}
         {dbRaceParticipants && dbRaceParticipants.length > 0 &&
           <Text style={styles.eventData}><Ionicons name="people" size={20} /> {dbRaceParticipants.length} Participants</Text>
