@@ -22,10 +22,11 @@ const INIT_LOCATION: Position = { latitude: 48.39, longitude: -4.48 };
 
 export default function Tracker() {
 
-  const { id, participantId, participantKey } = useLocalSearchParams();
+  const { id, eventId, participantId, participantKey } = useLocalSearchParams();
   const raceId = parseInt(id as string);
+  const raceEventId = parseInt(eventId as string);
   const raceParticipantId = parseInt(participantId as string);
-  const raceParticipantKey = participantKey[0];
+  const raceParticipantKey = participantKey;
 
   const [currentLocation, setCurrentLocation] = useState<Position>(INIT_LOCATION);
   const [isTracking, setIsTracking] = useState<boolean>(false);
@@ -49,7 +50,7 @@ export default function Tracker() {
       // Insert position into local database
       await addRaceParticipantPosition(
         raceParticipantId,
-        raceParticipantKey,
+        raceParticipantKey as string,
         new Date().getTime(),
         latitude,
         longitude
@@ -294,6 +295,7 @@ export default function Tracker() {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.pageInformations}>Event id: {raceEventId} - Race id: {raceId} - Participant id: {raceParticipantId} - Participant key: {raceParticipantKey}</Text>
 
       <View style={styles.mapContainer}>
         <WebView
@@ -354,6 +356,8 @@ export default function Tracker() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E3E5E7', paddingVertical: 40, paddingHorizontal: 10 },
+
+  pageInformations: {fontSize: 12, fontWeight: 'bold', marginBottom: 10},
   mapContainer: { height: 350 },
   map: { flex: 1 },
 
