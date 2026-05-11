@@ -30,7 +30,7 @@ export const addRaceParticipantPosition = async (
   try {
     const db = getDb();
     await db.runAsync(
-      `INSERT INTO race_participant_position (rpp_rp_id, rpp_rp_key, rp_date, rpp_latitude, rpp_longitude) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO race_participant_position (rpp_rp_id, rpp_rp_key, rpp_date, rpp_latitude, rpp_longitude) VALUES (?, ?, ?, ?, ?)`,
       [rpp_rp_id, rpp_rp_key, rpp_date, rpp_latitude, rpp_longitude]
     );
     console.log("Race participant position added for participant ID:", rpp_rp_id);

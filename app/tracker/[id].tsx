@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
 
 // CONFIG
@@ -36,12 +36,37 @@ export default function Tracker() {
   const [bearing, setBearing] = useState<number>(0);
   const [currentSpeed, setCurrentSpeed] = useState<number>(0);
 
+  const startTimeRef = useRef<number | null>(null);
   const lastTimestamp = useRef<number | null>(null);
   const lastBearing = useRef<number>(0);
 
   const webviewRef = useRef<WebView>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Gérer les permissions de localisation au montage et nettoyer à l'unmount
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission refusée', 'La permission d\'accéder à la localisation est nécessaire pour le tracking.');
+        return;
+      }
+    })();
+
+    // Fonction de nettoyage exécutée lorsque le composant est démonté
+    return () => {
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []); // Le tableau de dépendances vide signifie que cela s'exécute une fois au montage et se nettoie à l'unmount
+
 
   // SAVE POSITIONS
   const saveParticipantPosition = async (latitude: number, longitude: number) => {
@@ -196,15 +221,21 @@ export default function Tracker() {
   // ▶️ START
   const startTracking = async () => {
     setDistance(0);
-    setTimeElapsed(0);
+    setTimeElapsed(0); // Réinitialiser le temps écoulé
     setPath([]);
     setCurrentSpeed(0);
     lastTimestamp.current = null;
 
+    startTimeRef.current = Date.now(); // Enregistrer le temps de début réel
+
     timerRef.current = setInterval(() => {
-      setTimeElapsed(t => t + 1);
+      if (startTimeRef.current) {
+        // Calculer le temps écoulé depuis le début du tracking
+        setTimeElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }
     }, 1000) as unknown as NodeJS.Timeout;
 
+    // ... existing Location.watchPositionAsync setup ...
     locationSubscription.current = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.High,
@@ -215,7 +246,7 @@ export default function Tracker() {
         const { latitude, longitude, accuracy } = location.coords;
         if (accuracy != null && accuracy > MAX_ACCURACY) return;
 
-        const now = location.timestamp;
+        const now = location.timestamp; // Utilisez le timestamp de la localisation pour le calcul de vitesse
         const newPoint = { latitude, longitude };
 
         setPath(prev => {
@@ -235,13 +266,15 @@ export default function Tracker() {
           let speed = 0;
 
           if (lastTimestamp.current) {
-            const dt = (now - lastTimestamp.current) / 1000;
+            const dt = (now - lastTimestamp.current) / 1000; // Différence de temps en secondes
 
-            if (dt >= MIN_TIME) {
+            // Assurer que dt n'est pas zéro pour éviter la division par zéro
+            if (dt > 0) {
               if (d < MIN_SPEED_DISTANCE) {
                 speed = 0;
               } else {
-                speed = d / (dt / 3600);
+                // Convertir la distance (km) et le temps (secondes) en km/h
+                speed = (d / dt) * 3600;
               }
             }
           }
@@ -285,12 +318,26 @@ export default function Tracker() {
   // ⏹ STOP
   const stopTracking = () => {
     locationSubscription.current?.remove();
+    locationSubscription.current = null; // Important pour une réinitialisation propre
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    startTimeRef.current = null; // Réinitialiser le temps de début
 
     setIsTracking(false);
+  };
+
+  // Helper pour formater le temps en HH:MM:SS
+  const formatTime = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return [hours, minutes, seconds]
+      .map(v => v < 10 ? "0" + v : v)
+      .filter((v, i) => v !== "00" || i > 0) // Supprime les heures/minutes "00" si pas nécessaires
+      .join(":");
   };
 
   return (
@@ -326,8 +373,9 @@ export default function Tracker() {
 
           <View style={styles.card}>
             <Text style={styles.label}>Temps</Text>
-            <Text style={styles.value}>{timeElapsed}</Text>
-            <Text style={styles.unit}>sec</Text>
+            {/* Utilisation du formateur de temps */}
+            <Text style={styles.value}>{formatTime(timeElapsed)}</Text>
+            <Text style={styles.unit}></Text>{/* L'unité est incluse dans le format */}
           </View>
         </View>
 
@@ -354,10 +402,11 @@ export default function Tracker() {
   );
 };
 
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E3E5E7', paddingVertical: 40, paddingHorizontal: 10 },
 
-  pageInformations: {fontSize: 12, fontWeight: 'bold', marginBottom: 10},
+  pageInformations: { fontSize: 12, fontWeight: 'bold', marginBottom: 10 },
   mapContainer: { height: 350 },
   map: { flex: 1 },
 
