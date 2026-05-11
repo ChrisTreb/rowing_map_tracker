@@ -7,6 +7,14 @@
     "icon": "./assets/images/icon.png",
     "scheme": "rowingmaptracker",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#ffffff",
+      "dark": {
+        "backgroundColor": "#000000"
+      }
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -33,17 +41,7 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash.png",
-          "resizeMode": "cover",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
-      ],
+      "expo-splash-screen",
       "expo-sqlite",
       "expo-build-properties",
       "expo-web-browser"
