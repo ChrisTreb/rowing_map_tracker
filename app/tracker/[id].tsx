@@ -13,8 +13,8 @@ import { WebView } from 'react-native-webview';
 const MIN_DISTANCE: number = 0.005;
 const MIN_SPEED_DISTANCE: number = 0.01;
 const MAX_SPEED: number = 200; // Change to 50 in production
-const MAX_ACCURACY: number = 10;
-const LOCATION_UPDATE_INTERVAL: number = 2000; // Fréquence de mise à jour en ms
+const MAX_ACCURACY: number = 5;
+const LOCATION_UPDATE_INTERVAL: number = 2000; // Fréquence de mise à jour bdd ou api en ms
 const LOCATION_TASK_NAME = 'background-location-task'; // Nom unique pour la tâche
 
 // Clés AsyncStorage pour persister les IDs du participant
