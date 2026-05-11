@@ -24,6 +24,7 @@ export const getDb = () => {
  */
 export const dropAllTables = async (db) => {
   try {
+  
     if (db != null) {
       await db.execAsync(`
       DROP TABLE IF EXISTS race_participant_position;
@@ -51,6 +52,8 @@ export const dropAllTables = async (db) => {
 export const initDb = async () => {
   try {
     db = await SQLite.openDatabaseAsync("rowing_tracker.db");
+
+    // dropAllTables(db);
 
     // ... existing schema definition ...
     await db.execAsync(`
@@ -123,7 +126,7 @@ export const initDb = async () => {
 
       CREATE TABLE IF NOT EXISTS race_participant_position (
         rpp_id INTEGER NOT NULL PRIMARY KEY,
-        rrp_rp_key TEXT NOT NULL,
+        rpp_rp_key TEXT NOT NULL,
         rpp_rp_id INTEGER NOT NULL REFERENCES race_participant(rp_id) ON DELETE CASCADE,
         rpp_date INTEGER NOT NULL,
         rpp_latitude DECIMAL NOT NULL,

@@ -1,24 +1,128 @@
 import { addRaceParticipantPosition } from '@/services/raceParticipantPosition';
 import { ClassPosition, Position } from '@/types/Position';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
+import * as TaskManager from 'expo-task-manager';
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
 
 // CONFIG
 const MIN_DISTANCE: number = 0.005;
 const MIN_SPEED_DISTANCE: number = 0.01;
-const MIN_TIME: number = 5;
 const MAX_SPEED: number = 200; // Change to 50 in production
 const MAX_ACCURACY: number = 10;
+const LOCATION_UPDATE_INTERVAL: number = 2000; // Fréquence de mise à jour en ms
+const LOCATION_TASK_NAME = 'background-location-task'; // Nom unique pour la tâche
+
+// Clés AsyncStorage pour persister les IDs du participant
+const ASYNC_STORAGE_RP_ID = 'rp_id';
+const ASYNC_STORAGE_RP_KEY = 'rp_key';
+const ASYNC_STORAGE_START_TIME = 'tracking_start_time';
+
 
 // API configuration
 const apiURL = process.env.EXPO_PUBLIC_API_URL;
 const apiKey = process.env.EXPO_PUBLIC_API_KEY;
 
 const INIT_LOCATION: Position = { latitude: 48.39, longitude: -4.48 };
+
+// 🔥 BEARING
+const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const toRad = (deg: number) => deg * Math.PI / 180;
+  const toDeg = (rad: number) => rad * 180 / Math.PI;
+
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δλ = toRad(lon2 - lon1);
+
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) -
+    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+};
+
+// 🔥 DISTANCE
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3;
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) ** 2 +
+    Math.cos(φ1) * Math.cos(φ2) *
+    Math.sin(Δλ / 2) ** 2;
+
+  return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1000;
+};
+
+// SAVE POSITIONS (pour TaskManager)
+const globalSaveParticipantPosition = async (
+  rpp_rp_id: number,
+  rpp_rp_key: string,
+  latitude: number,
+  longitude: number
+) => {
+  try {
+    await addRaceParticipantPosition(
+      rpp_rp_id,
+      rpp_rp_key,
+      new Date().getTime(),
+      latitude,
+      longitude
+    );
+    console.log(`Position saved locally for ${rpp_rp_key}: ${latitude}, ${longitude}`);
+  } catch (error) {
+    console.error("Failed insertion new position into local database from background task:", error);
+    return;
+  }
+
+  try {
+    const participantPosition = new ClassPosition(latitude, longitude);
+
+    const response = await fetch(`${apiURL}/position/${rpp_rp_key}`, {
+      method: 'POST',
+      body: JSON.stringify(participantPosition),
+    });
+
+    console.log(`Api Post position response code for ${rpp_rp_key}: ${response.status}`);
+
+  } catch (error) {
+    console.error("Failed posting new position to API from background task:", error);
+  }
+};
+
+// --- Définition de la tâche de localisation en arrière-plan ---
+TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+  if (error) {
+    console.error('LOCATION_TASK_ERROR', error);
+    return;
+  }
+  if (data) {
+    const { locations } = data as { locations: Location.LocationObject[] };
+    const latestLocation = locations[0];
+
+    const storedParticipantId = await AsyncStorage.getItem(ASYNC_STORAGE_RP_ID);
+    const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
+
+    if (storedParticipantId && storedParticipantKey) {
+      await globalSaveParticipantPosition(
+        parseInt(storedParticipantId),
+        storedParticipantKey,
+        latestLocation.coords.latitude,
+        latestLocation.coords.longitude
+      );
+    } else {
+      console.warn('Participant ID or Key not found in AsyncStorage for background task. Cannot save position.');
+    }
+  }
+});
+
 
 export default function Tracker() {
 
@@ -29,6 +133,7 @@ export default function Tracker() {
   const raceParticipantKey = participantKey;
 
   const [currentLocation, setCurrentLocation] = useState<Position>(INIT_LOCATION);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [isTracking, setIsTracking] = useState<boolean>(false);
   const [distance, setDistance] = useState<number>(0);
   const [timeElapsed, setTimeElapsed] = useState<number>(0);
@@ -41,81 +146,124 @@ export default function Tracker() {
   const lastBearing = useRef<number>(0);
 
   const webviewRef = useRef<WebView>(null);
-  const locationSubscription = useRef<Location.LocationSubscription | null>(null);
+  const locationSubscription = useRef<Location.LocationSubscription | null>(null); // Pour le suivi en premier plan (UI)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Gérer les permissions de localisation au montage et nettoyer à l'unmount
   useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission refusée', 'La permission d\'accéder à la localisation est nécessaire pour le tracking.');
+    const initializeTrackingAndPermissions = async () => {
+      // Demande de permission de localisation en premier plan
+      let { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+      if (foregroundStatus !== 'granted') {
+        Alert.alert('Permission refusée', 'La permission d\'accéder à la localisation en premier plan est nécessaire.');
+        setIsLoadingLocation(false); // Arrêter le chargement même en cas d'erreur
         return;
       }
-    })();
 
-    // Fonction de nettoyage exécutée lorsque le composant est démonté
-    return () => {
-      if (locationSubscription.current) {
-        locationSubscription.current.remove();
-        locationSubscription.current = null;
+      // Demande de permission de localisation en arrière-plan (Android/iOS)
+      let { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+      if (backgroundStatus !== 'granted') {
+        Alert.alert('Permission refusée', 'La permission d\'accéder à la localisation en arrière-plan est nécessaire pour le tracking continu.');
+        // Le tracking de l'UI peut toujours fonctionner, mais le tracking en arrière-plan sera limité.
       }
+
+      // Tenter de récupérer la position actuelle du téléphone
+      try {
+        const initialLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        setCurrentLocation({
+          latitude: initialLocation.coords.latitude,
+          longitude: initialLocation.coords.longitude,
+        });
+        // Si le chemin est vide, ajouter la position initiale
+        setPath([{
+          latitude: initialLocation.coords.latitude,
+          longitude: initialLocation.coords.longitude,
+        }]);
+      } catch (error) {
+        console.error("Failed to get initial location:", error);
+        Alert.alert("Erreur", "Impossible de récupérer votre position actuelle.");
+      } finally {
+        setIsLoadingLocation(false); // Fin du chargement de la position initiale
+      }
+
+
+      // Vérifier si la tâche est déjà enregistrée et si le tracking est actif
+      const isTaskActive = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+      setIsTracking(isTaskActive);
+
+      // Si le tracking était déjà actif, on peut tenter de récupérer le temps de début
+      if (isTaskActive) {
+          const storedStartTime = await AsyncStorage.getItem(ASYNC_STORAGE_START_TIME);
+          if (storedStartTime) {
+              startTimeRef.current = parseInt(storedStartTime);
+              // Lancer le timer pour le temps écoulé si le tracking est actif
+              timerRef.current = setInterval(() => {
+                if (startTimeRef.current) {
+                  setTimeElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+                }
+              }, 1000) as unknown as NodeJS.Timeout;
+          }
+          console.log("Background location task was active. UI state might not reflect actual path/distance without persistence load.");
+
+          // Lancer un watchPositionAsync juste pour mettre à jour l'UI en premier plan
+          locationSubscription.current = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.High,
+              timeInterval: 1000,
+              distanceInterval: 1
+            },
+            (location) => {
+              const { latitude, longitude, accuracy } = location.coords;
+              if (accuracy != null && accuracy > MAX_ACCURACY) return;
+
+              const now = location.timestamp;
+              const newPoint = { latitude, longitude };
+
+              setPath(prev => {
+                if (prev.length === 0) return [newPoint];
+                const last = prev[prev.length - 1];
+                const d = calculateDistance(last.latitude, last.longitude, latitude, longitude);
+                if (d < MIN_DISTANCE) return prev;
+
+                let speed = 0;
+                if (lastTimestamp.current) {
+                  const dt = (now - lastTimestamp.current) / 1000;
+                  if (dt > 0) speed = (d / dt) * 3600;
+                }
+                lastTimestamp.current = now;
+                if (speed > MAX_SPEED) return prev;
+
+                setCurrentSpeed(prev => prev * 0.7 + speed * 0.3);
+                if (speed > 1) {
+                  const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
+                  const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
+                  lastBearing.current = smoothBearing;
+                  setBearing(smoothBearing);
+                }
+                setDistance(dist => dist + d);
+                return [...prev, newPoint];
+              });
+              setCurrentLocation(newPoint);
+            }
+          );
+      }
+    };
+
+    initializeTrackingAndPermissions();
+
+    return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
+      }
     };
-  }, []); // Le tableau de dépendances vide signifie que cela s'exécute une fois au montage et se nettoie à l'unmount
-
-
-  // SAVE POSITIONS
-  const saveParticipantPosition = async (latitude: number, longitude: number) => {
-
-    try {
-      // Insert position into local database
-      await addRaceParticipantPosition(
-        raceParticipantId,
-        raceParticipantKey as string,
-        new Date().getTime(),
-        latitude,
-        longitude
-      );
-    } catch (error) {
-      console.error("Failed insertion new position into local database:", error);
-      return;
-    }
-
-    try {
-      const participantPosition = new ClassPosition(latitude, longitude);
-
-      const response = await fetch(`${apiURL}/position/${participantKey}`, {
-        method: 'POST',
-        body: JSON.stringify(participantPosition),
-      });
-
-      console.log("Api Post position response code:", response.status);
-
-    } catch (error) {
-      console.error("Failed posting new position to API:", error);
-    }
-  }
-
-  // 🔥 BEARING
-  const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const toRad = (deg: number) => deg * Math.PI / 180;
-    const toDeg = (rad: number) => rad * 180 / Math.PI;
-
-    const φ1 = toRad(lat1);
-    const φ2 = toRad(lat2);
-    const Δλ = toRad(lon2 - lon1);
-
-    const y = Math.sin(Δλ) * Math.cos(φ2);
-    const x =
-      Math.cos(φ1) * Math.sin(φ2) -
-      Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-
-    return (toDeg(Math.atan2(y, x)) + 360) % 360;
-  };
+  }, []); // Le tableau de dépendances vide assure qu'il s'exécute une seule fois au montage
 
   // 🌍 MAP
   const leafletHtml = `
@@ -192,140 +340,162 @@ export default function Tracker() {
   </html>
   `;
 
-  /// 📡 SEND MAP
+  /// 📡 SEND MAP (remis à l'intérieur du composant)
   useEffect(() => {
-    webviewRef.current?.postMessage(JSON.stringify({
-      lat: currentLocation.latitude,
-      lng: currentLocation.longitude,
-      path,
-      bearing,
-      follow: true
-    }));
+    // Ne met à jour la WebView que si l'application est en premier plan
+    // et que le ref de la webview est disponible.
+    if (AppState.currentState === 'active' && webviewRef.current) {
+        webviewRef.current?.postMessage(JSON.stringify({
+            lat: currentLocation.latitude,
+            lng: currentLocation.longitude,
+            path,
+            bearing,
+            follow: true
+        }));
+    }
   }, [currentLocation, path, bearing]);
 
-  // 🔥 DISTANCE
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371e3;
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-    const a = Math.sin(Δφ / 2) ** 2 +
-      Math.cos(φ1) * Math.cos(φ2) *
-      Math.sin(Δλ / 2) ** 2;
-
-    return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1000;
-  };
 
   // ▶️ START
   const startTracking = async () => {
+    const hasStarted = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+    if (hasStarted) {
+      Alert.alert("Tracking", "Le tracking est déjà démarré.");
+      setIsTracking(true);
+      return;
+    }
+
+    // Réinitialiser l'état UI
     setDistance(0);
-    setTimeElapsed(0); // Réinitialiser le temps écoulé
+    setTimeElapsed(0);
     setPath([]);
     setCurrentSpeed(0);
     lastTimestamp.current = null;
 
-    startTimeRef.current = Date.now(); // Enregistrer le temps de début réel
+    startTimeRef.current = Date.now();
+    await AsyncStorage.setItem(ASYNC_STORAGE_START_TIME, startTimeRef.current.toString()); // Persister le temps de début
 
     timerRef.current = setInterval(() => {
       if (startTimeRef.current) {
-        // Calculer le temps écoulé depuis le début du tracking
         setTimeElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }
     }, 1000) as unknown as NodeJS.Timeout;
 
-    // ... existing Location.watchPositionAsync setup ...
-    locationSubscription.current = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 1000,
-        distanceInterval: 1
-      },
-      (location) => {
-        const { latitude, longitude, accuracy } = location.coords;
-        if (accuracy != null && accuracy > MAX_ACCURACY) return;
+    try {
+      // Stocker les IDs du participant dans AsyncStorage pour la tâche en arrière-plan
+      await AsyncStorage.setItem(ASYNC_STORAGE_RP_ID, raceParticipantId.toString());
+      await AsyncStorage.setItem(ASYNC_STORAGE_RP_KEY, raceParticipantKey as string);
 
-        const now = location.timestamp; // Utilisez le timestamp de la localisation pour le calcul de vitesse
-        const newPoint = { latitude, longitude };
+      await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+        accuracy: Location.Accuracy.BestForNavigation,
+        distanceInterval: 1, // Mètres
+        timeInterval: LOCATION_UPDATE_INTERVAL, // Millisecondes
+        foregroundService: {
+          notificationTitle: 'Tracking de la course',
+          notificationBody: `Votre position est partagée pour l'événement ${raceEventId} et participant ${raceParticipantKey}.`,
+          notificationColor: '#216161',
+        },
+        activityType: Location.ActivityType.OtherNavigation,
+        pausesUpdatesAutomatically: false,
+      });
 
-        setPath(prev => {
-          if (prev.length === 0) return [newPoint];
+      setIsTracking(true);
+      Alert.alert("Tracking démarré", "Le suivi GPS est maintenant actif en arrière-plan. Une notification est visible.");
 
-          const last = prev[prev.length - 1];
+      // Démarrer le watchPositionAsync pour mettre à jour l'UI en premier plan
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 1000,
+          distanceInterval: 1
+        },
+        (location) => {
+          const { latitude, longitude, accuracy } = location.coords;
+          if (accuracy != null && accuracy > MAX_ACCURACY) return;
 
-          const d = calculateDistance(
-            last.latitude,
-            last.longitude,
-            latitude,
-            longitude
-          );
+          const now = location.timestamp;
+          const newPoint = { latitude, longitude };
 
-          if (d < MIN_DISTANCE) return prev;
+          setPath(prev => {
+            if (prev.length === 0) return [newPoint];
+            const last = prev[prev.length - 1];
+            const d = calculateDistance(last.latitude, last.longitude, latitude, longitude);
+            if (d < MIN_DISTANCE) return prev;
 
-          let speed = 0;
-
-          if (lastTimestamp.current) {
-            const dt = (now - lastTimestamp.current) / 1000; // Différence de temps en secondes
-
-            // Assurer que dt n'est pas zéro pour éviter la division par zéro
-            if (dt > 0) {
-              if (d < MIN_SPEED_DISTANCE) {
-                speed = 0;
-              } else {
-                // Convertir la distance (km) et le temps (secondes) en km/h
-                speed = (d / dt) * 3600;
-              }
+            let speed = 0;
+            if (lastTimestamp.current) {
+              const dt = (now - lastTimestamp.current) / 1000;
+              if (dt > 0) speed = (d / dt) * 3600;
             }
-          }
+            lastTimestamp.current = now;
+            if (speed > MAX_SPEED) return prev;
 
-          lastTimestamp.current = now;
+            setCurrentSpeed(prev => prev * 0.7 + speed * 0.3);
+            if (speed > 1) {
+              const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
+              const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
+              lastBearing.current = smoothBearing;
+              setBearing(smoothBearing);
+            }
+            setDistance(dist => dist + d);
+            return [...prev, newPoint];
+          });
+          setCurrentLocation(newPoint);
+          // La sauvegarde de position est gérée par la tâche en arrière-plan.
+          // On ne fait que mettre à jour l'UI ici.
+        }
+      );
 
-          if (speed > MAX_SPEED) return prev;
-
-          // 🔥 smoothing
-          setCurrentSpeed(prev => prev * 0.7 + speed * 0.3);
-
-          // 🔥 bearing stable
-          if (speed > 1) {
-            const raw: number = getBearing(
-              last.latitude,
-              last.longitude,
-              latitude,
-              longitude
-            );
-
-            const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
-            lastBearing.current = smoothBearing;
-            setBearing(smoothBearing);
-          }
-
-          setDistance(dist => dist + d);
-
-          return [...prev, newPoint];
-        });
-
-        setCurrentLocation(newPoint);
-
-        // Insertion des coordonnées actuelle en base locale + envoi vers api
-        saveParticipantPosition(newPoint.latitude, newPoint.longitude);
-      }
-    );
-
-    setIsTracking(true);
+    } catch (e) {
+      console.error('Error starting location updates:', e);
+      Alert.alert("Erreur", "Impossible de démarrer le suivi GPS. Vérifiez les permissions.");
+      setIsTracking(false);
+      // Nettoyer en cas d'échec
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      startTimeRef.current = null;
+      await AsyncStorage.multiRemove([ASYNC_STORAGE_RP_ID, ASYNC_STORAGE_RP_KEY, ASYNC_STORAGE_START_TIME]);
+    }
   };
 
   // ⏹ STOP
-  const stopTracking = () => {
-    locationSubscription.current?.remove();
-    locationSubscription.current = null; // Important pour une réinitialisation propre
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+  const stopTracking = async () => {
+    const hasStarted = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+    if (!hasStarted) {
+      Alert.alert("Tracking", "Le tracking n'est pas actif.");
+      setIsTracking(false);
+      return;
     }
-    startTimeRef.current = null; // Réinitialiser le temps de début
 
-    setIsTracking(false);
+    try {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+      if (locationSubscription.current) {
+          locationSubscription.current.remove();
+          locationSubscription.current = null;
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      startTimeRef.current = null; // Réinitialiser le temps de début
+
+      // Nettoyer les données persistantes du tracking
+      await AsyncStorage.multiRemove([ASYNC_STORAGE_RP_ID, ASYNC_STORAGE_RP_KEY, ASYNC_STORAGE_START_TIME]);
+
+      setIsTracking(false);
+      Alert.alert("Tracking arrêté", "Le suivi GPS a été désactivé.");
+
+      // Réinitialiser l'UI pour un arrêt propre
+      setDistance(0);
+      setTimeElapsed(0);
+      setPath([]);
+      setCurrentSpeed(0);
+      setBearing(0);
+      setCurrentLocation(INIT_LOCATION);
+
+    } catch (e) {
+      console.error('Error stopping location updates:', e);
+      Alert.alert("Erreur", "Impossible d'arrêter le suivi GPS.");
+    }
   };
 
   // Helper pour formater le temps en HH:MM:SS
@@ -336,9 +506,19 @@ export default function Tracker() {
 
     return [hours, minutes, seconds]
       .map(v => v < 10 ? "0" + v : v)
-      .filter((v, i) => v !== "00" || i > 0) // Supprime les heures/minutes "00" si pas nécessaires
+      .filter((v, i) => v !== "00" || i > 0)
       .join(":");
   };
+
+  // Rendu conditionnel pendant le chargement de la position initiale
+  if (isLoadingLocation) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+        <Text style={styles.loadingText}>Chargement de votre position...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -373,9 +553,8 @@ export default function Tracker() {
 
           <View style={styles.card}>
             <Text style={styles.label}>Temps</Text>
-            {/* Utilisation du formateur de temps */}
             <Text style={styles.value}>{formatTime(timeElapsed)}</Text>
-            <Text style={styles.unit}></Text>{/* L'unité est incluse dans le format */}
+            <Text style={styles.unit}></Text>
           </View>
         </View>
 
@@ -402,7 +581,7 @@ export default function Tracker() {
   );
 };
 
-
+// ... Styles restent inchangés ...
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E3E5E7', paddingVertical: 40, paddingHorizontal: 10 },
 
@@ -447,4 +626,17 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, color: "#E3E5E7" },
   value: { fontSize: 28, fontWeight: "bold", color: "#E3E5E7" },
   unit: { fontSize: 12, color: "#E3E5E7" },
+
+  // Nouveaux styles pour le chargement
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E3E5E7',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 18,
+    color: '#555',
+  },
 });
