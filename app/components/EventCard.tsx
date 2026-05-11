@@ -45,8 +45,8 @@ const EventCard = ({ event }: EventCardProps) => {
         </Text>
         {/* Afficher toutes les clés associées de la DB locale */}
         {!keysLoading && associatedKeys && associatedKeys.length > 0 && (
-          <Text style={styles.text}>
-            <Ionicons name="key" size={16} color="#2c2c2c" /> {participantKeyView}
+          <Text style={styles.textKey}>
+            <Ionicons name="key" size={18} color="#0A0F0E" /> {participantKeyView}
           </Text>
         )}
         {keysLoading && <ActivityIndicator size="small" color="#007bff" />}
@@ -84,6 +84,17 @@ const styles = StyleSheet.create({
     marginBottom: 3,
     color: "#555",
   },
+  textKey: {
+    textAlign: 'center',
+    width: 80,
+    fontSize: 16,
+    fontWeight: 'bold',
+    padding: 5,
+    marginBottom: 3,
+    borderRadius: 8,
+    color: "#0A0F0E",
+    backgroundColor: "#A7C7D2",
+  },
   linkContainer: {
     display: "flex",
     justifyContent: "center",
@@ -96,7 +107,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 3,
   },
 });
 

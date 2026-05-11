@@ -382,7 +382,7 @@ export default function Tracker() {
         <View style={styles.row}>
           <View style={styles.card}>
             <Text style={styles.label}>Vitesse actuelle</Text>
-            <Text style={[styles.value, { color: "#A7C7D2" }]}>
+            <Text style={[styles.value, { color: "#FFCE39" }]}>
               {currentSpeed.toFixed(2)}
             </Text>
             <Text style={styles.unit}>km/h</Text>
