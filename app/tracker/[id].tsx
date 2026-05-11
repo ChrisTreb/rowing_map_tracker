@@ -1,3 +1,5 @@
+import { addRaceParticipantPosition } from '@/services/raceParticipantPosition';
+import { ClassPosition, Position } from '@/types/Position';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
@@ -8,18 +10,24 @@ import { WebView } from 'react-native-webview';
 // CONFIG
 const MIN_DISTANCE: number = 0.005;
 const MIN_SPEED_DISTANCE: number = 0.01;
-const MIN_TIME: number = 1;
-const MAX_SPEED: number = 200;
+const MIN_TIME: number = 5;
+const MAX_SPEED: number = 200; // Change to 50 in production
 const MAX_ACCURACY: number = 10;
 
-const INIT_LOCATION: { latitude: number; longitude: number } = { latitude: 48.39, longitude: -4.48 };
+// API configuration
+const apiURL = process.env.EXPO_PUBLIC_API_URL;
+const apiKey = process.env.EXPO_PUBLIC_API_KEY;
+
+const INIT_LOCATION: Position = { latitude: 48.39, longitude: -4.48 };
 
 export default function Tracker() {
 
-  const { id } = useLocalSearchParams();
-  const raceId = id ? parseInt(id as string) : null;
+  const { id, participantId, participantKey } = useLocalSearchParams();
+  const raceId = parseInt(id as string);
+  const raceParticipantId = parseInt(participantId as string);
+  const raceParticipantKey = participantKey[0];
 
-  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number }>(INIT_LOCATION);
+  const [currentLocation, setCurrentLocation] = useState<Position>(INIT_LOCATION);
   const [isTracking, setIsTracking] = useState<boolean>(false);
   const [distance, setDistance] = useState<number>(0);
   const [timeElapsed, setTimeElapsed] = useState<number>(0);
@@ -33,6 +41,38 @@ export default function Tracker() {
   const webviewRef = useRef<WebView>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // SAVE POSITIONS
+  const saveParticipantPosition = async (latitude: number, longitude: number) => {
+
+    try {
+      // Insert position into local database
+      await addRaceParticipantPosition(
+        raceParticipantId,
+        raceParticipantKey,
+        new Date().getTime(),
+        latitude,
+        longitude
+      );
+    } catch (error) {
+      console.error("Failed insertion new position into local database:", error);
+      return;
+    }
+
+    try {
+      const participantPosition = new ClassPosition(latitude, longitude);
+
+      const response = await fetch(`${apiURL}/position/${participantKey}`, {
+        method: 'POST',
+        body: JSON.stringify(participantPosition),
+      });
+
+      console.log("Api Post position response code:", response.status);
+
+    } catch (error) {
+      console.error("Failed posting new position to API:", error);
+    }
+  }
 
   // 🔥 BEARING
   const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -226,15 +266,15 @@ export default function Tracker() {
             setBearing(smoothBearing);
           }
 
-          // DB insert TODO
-          //addRaceParticipantPosition(1, now, latitude, longitude);
-
           setDistance(dist => dist + d);
 
           return [...prev, newPoint];
         });
 
         setCurrentLocation(newPoint);
+
+        // Insertion des coordonnées actuelle en base locale + envoi vers api
+        saveParticipantPosition(newPoint.latitude, newPoint.longitude);
       }
     );
 
@@ -329,7 +369,7 @@ const styles = StyleSheet.create({
     color: '#f8f9ff',
     elevation: 3,
   },
-  btnText: { fontSize: 20, color: '#f8f9ff', fontWeight: 'bold'},
+  btnText: { fontSize: 20, color: '#f8f9ff', fontWeight: 'bold' },
   btnStart: { backgroundColor: "#216161" },
   btnStop: { backgroundColor: "#FE4B32" },
 

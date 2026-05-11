@@ -223,7 +223,7 @@ export default function RaceScreen() {
                   <Text style={styles.participantText}><Ionicons name="boat" size={20} /> Bib: {participant.rp_bib}</Text>
                   <Text style={styles.participantText}><Ionicons name="person-circle" size={20} /> Nom: {participant.rp_name}</Text>
                   {localKeys?.includes(participant.rp_key) &&
-                    <Link href={{ pathname: "/tracker/[id]", params:{ id: participant.rp_ra_id } }} style={styles.trackerLink} >
+                    <Link href={{ pathname: "/tracker/[id]", params:{ id: participant.rp_ra_id, participantId: participant.rp_id, participantKey: participant.rp_key } }} style={styles.trackerLink} >
                       <Ionicons name="play-circle-outline" size={20} /> <Text>Accéder au tracker</Text> 
                     </Link>
                   }

@@ -123,6 +123,7 @@ export const initDb = async () => {
 
       CREATE TABLE IF NOT EXISTS race_participant_position (
         rpp_id INTEGER NOT NULL PRIMARY KEY,
+        rrp_rp_key TEXT NOT NULL,
         rpp_rp_id INTEGER NOT NULL REFERENCES race_participant(rp_id) ON DELETE CASCADE,
         rpp_date INTEGER NOT NULL,
         rpp_latitude DECIMAL NOT NULL,
@@ -189,5 +190,5 @@ export const { addSession, getSessionById, deleteSession } = sessionOperations;
 export const { addRaceEvent, getRaceEvents, getRaceEventById, updateRaceEvent } = raceEventOperations;
 export const { addRaceEventTrack, getRaceEventTracksByRaceEventId, getRaceEventTrackById, updateRaceEventTrack } = raceEventTrackOperations;
 export const { addRaceParticipant, getRaceParticipantsByRaceId, getRaceParticipantById, updateRaceParticipant, deleteRaceParticipant } = raceParticipantOperations;
-export const { addRaceParticipantPosition, getRaceParticipantPositionsByParticipantId, deleteRaceParticipantPositionsByParticipantId } = raceParticipantPositionOperations;
+export const { addRaceParticipantPosition, getRaceParticipantPositionsByParticipantKey, deleteRaceParticipantPositionsByParticipantId } = raceParticipantPositionOperations;
 

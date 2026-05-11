@@ -1,7 +1,22 @@
 export type Position = {
-    rpp_id: number;
-    rpp_rp_key: string;
-    rpp_date: number;
-    rpp_latitude: number;
-    rpp_longitude: number;
+    latitude: number;
+    longitude: number;
 };
+
+export class ClassPosition {
+    private latitude: number;
+    private longitude: number;
+
+    constructor(latitude: number, longitude: number) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+    }
+
+    public getLatitude() {
+        return this.latitude;
+    }
+
+    public getLongitude() {
+        return this.longitude;
+    }
+}
