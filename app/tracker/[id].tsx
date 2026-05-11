@@ -266,11 +266,11 @@ export default function Tracker() {
 
       {!isTracking ? (
         <TouchableOpacity onPress={startTracking} style={[styles.btn, styles.btnStart]}>
-          <Ionicons name="play" size={40} color="white" />
+          <Text style={styles.btnText}><Ionicons name="play" size={26} color="white" /> Démarrer le tracking</Text>
         </TouchableOpacity>
       ) : (
         <TouchableOpacity onPress={stopTracking} style={[styles.btn, styles.btnStop]}>
-          <Ionicons name="stop" size={40} color="white" />
+          <Text style={styles.btnText}><Ionicons name="stop" size={26} color="white" /> Stopper le tracking</Text>
         </TouchableOpacity>
       )}
 
@@ -292,7 +292,7 @@ export default function Tracker() {
         <View style={styles.row}>
           <View style={styles.card}>
             <Text style={styles.label}>Vitesse actuelle</Text>
-            <Text style={[styles.value, { color: "#4266f5" }]}>
+            <Text style={[styles.value, { color: "#A7C7D2" }]}>
               {currentSpeed.toFixed(2)}
             </Text>
             <Text style={styles.unit}>km/h</Text>
@@ -313,21 +313,25 @@ export default function Tracker() {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#E3E5E7', paddingVertical: 40, paddingHorizontal: 10 },
   mapContainer: { height: 350 },
   map: { flex: 1 },
 
   btn: {
+    display: 'flex',
     alignItems: "center",
     justifyContent: "center",
-    width: 80,
+    width: '100%',
     height: 80,
     alignSelf: "center",
-    marginTop: -20,
-    borderRadius: 40
+    marginTop: 20,
+    borderRadius: 40,
+    color: '#f8f9ff',
+    elevation: 3,
   },
-  btnStart: { backgroundColor: "#4266f5" },
-  btnStop: { backgroundColor: "#ff895e" },
+  btnText: { fontSize: 20, color: '#f8f9ff', fontWeight: 'bold'},
+  btnStart: { backgroundColor: "#216161" },
+  btnStop: { backgroundColor: "#FE4B32" },
 
   infos: { marginTop: 20, paddingHorizontal: 15 },
 
@@ -339,15 +343,15 @@ const styles = StyleSheet.create({
 
   card: {
     flex: 1,
-    backgroundColor: "#f8f9ff",
+    backgroundColor: "#0A0F0E",
     borderRadius: 16,
     padding: 15,
-    marginHorizontal: 5,
+    marginHorizontal: 3,
     alignItems: "center",
     elevation: 3,
   },
 
-  label: { fontSize: 13, color: "#888" },
-  value: { fontSize: 24, fontWeight: "bold" },
-  unit: { fontSize: 12, color: "#888" },
+  label: { fontSize: 16, color: "#E3E5E7" },
+  value: { fontSize: 28, fontWeight: "bold", color: "#E3E5E7" },
+  unit: { fontSize: 12, color: "#E3E5E7" },
 });
