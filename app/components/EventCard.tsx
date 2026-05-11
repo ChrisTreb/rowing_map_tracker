@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Link } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { DbPhoneRpKey, getPhoneRpKeysByRaceEventId } from "../../services/phoneKeys";
@@ -10,7 +11,7 @@ interface EventCardProps {
 }
 
 const EventCard = ({ event }: EventCardProps) => {
-  const [associatedKeys, setAssociatedKeys] = useState<DbPhoneRpKey[]>([]);
+  const [associatedKeys, setAssociatedKeys] = useState<DbPhoneRpKey[] | null>([]);
   const [keysLoading, setKeysLoading] = useState(true);
 
   useEffect(() => {
@@ -29,25 +30,33 @@ const EventCard = ({ event }: EventCardProps) => {
     fetchKeys();
   }, [event.re_id]); // Re-déclencher si l'ID de l'événement change
 
-  const participantKeyView = associatedKeys.map(key => key.prk_rp_key).join(", ");
+  const participantKeyView = associatedKeys?.map(key => key.prk_rp_key).join(", ") ?? ""; 
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>{event.re_event_name}</Text>
-      <Text style={styles.text}>Participants: {event.nb_participants}</Text>
-      <Text style={styles.text}>
-        Début: {formatDateTime(event.re_event_start_date_and_time)}
-      </Text>
-      <Text style={styles.text}>
-        Fin: {formatDateTime(event.re_event_end_date_and_time)}
-      </Text>
-      {/* Afficher toutes les clés associées de la DB locale */}
-      {!keysLoading && associatedKeys.length > 0 && (
+      <View>
+        <Text style={styles.title}>{event.re_event_name}</Text>
+        <Text style={styles.text}>Participants: {event.nb_participants}</Text>
         <Text style={styles.text}>
-          <Ionicons name="key" size={16} color="#2c2c2c" /> {participantKeyView}
+          Début: {formatDateTime(event.re_event_start_date_and_time)}
         </Text>
-      )}
-      {keysLoading && <ActivityIndicator size="small" color="#007bff" />}
+        <Text style={styles.text}>
+          Fin: {formatDateTime(event.re_event_end_date_and_time)}
+        </Text>
+        {/* Afficher toutes les clés associées de la DB locale */}
+        {!keysLoading && associatedKeys && associatedKeys.length > 0 && (
+          <Text style={styles.text}>
+            <Ionicons name="key" size={16} color="#2c2c2c" /> {participantKeyView}
+          </Text>
+        )}
+        {keysLoading && <ActivityIndicator size="small" color="#007bff" />}
+      </View>
+      <View style={styles.linkContainer}>
+        {/* Construisez le href pour inclure l'ID de l'événement */}
+        <Link href={{ pathname: "/event/[id]", params: { id: event.re_id } }} >
+          <Ionicons name="play-circle-outline" size={45} color="#E3E5E7" />
+        </Link>
+      </View>
     </View>
   );
 };
@@ -55,7 +64,11 @@ const EventCard = ({ event }: EventCardProps) => {
 // Styles réutilisés pour la carte
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#f5f7ff",
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
     padding: 15,
     borderRadius: 12,
     marginBottom: 10,
@@ -67,8 +80,23 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   text: {
-    fontSize: 13,
+    fontSize: 14,
+    marginBottom: 3,
     color: "#555",
+  },
+  linkContainer: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#216161",
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });
 
