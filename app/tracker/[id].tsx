@@ -2,16 +2,16 @@ import { addRaceParticipantPosition } from '@/services/raceParticipantPosition';
 import { ClassPosition, Position } from '@/types/Position';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import * as IntentLauncher from 'expo-intent-launcher';
 import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
 import * as TaskManager from 'expo-task-manager';
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, AppState, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
 
 // CONFIG
 const MIN_DISTANCE: number = 0.005;
-const MIN_SPEED_DISTANCE: number = 0.01;
 const MAX_SPEED: number = 200; // Change to 50 in production
 const MAX_ACCURACY: number = 30;
 const LOCATION_UPDATE_INTERVAL: number = 2000; // Fréquence de mise à jour bdd ou api en ms
@@ -25,9 +25,16 @@ const ASYNC_STORAGE_START_TIME = 'tracking_start_time';
 
 // API configuration
 const apiURL = process.env.EXPO_PUBLIC_API_URL;
-const apiKey = process.env.EXPO_PUBLIC_API_KEY;
 
 const INIT_LOCATION: Position = { latitude: 48.39, longitude: -4.48 };
+
+export const openBatteryOptimizationSettings = async () => {
+  if (Platform.OS === 'android') {
+    await IntentLauncher.startActivityAsync(
+      IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+    );
+  }
+};
 
 // 🔥 BEARING
 const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -538,6 +545,10 @@ export default function Tracker() {
         />
       </View>
 
+      <TouchableOpacity onPress={openBatteryOptimizationSettings} style={styles.btnBattery}>
+        <Text style={styles.btnText}><Ionicons name="flash" size={26} color="white" /> Désactiver l'optimisation batterie</Text>
+      </TouchableOpacity>
+
       {!isTracking ? (
         <TouchableOpacity onPress={startTracking} style={[styles.btn, styles.btnStart]}>
           <Text style={styles.btnText}><Ionicons name="play" size={26} color="white" /> Démarrer le tracking</Text>
@@ -599,12 +610,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     width: '100%',
-    height: 80,
+    height: 60,
     alignSelf: "center",
     marginTop: 20,
     borderRadius: 40,
-    color: '#f8f9ff',
     elevation: 3,
+  },
+  btnBattery: {
+    display: 'flex',
+    alignItems: "center",
+    justifyContent: "center",
+    width: '100%',
+    height: 60,
+    alignSelf: "center",
+    marginTop: 20,
+    borderRadius: 40,
+    elevation: 3,
+    backgroundColor: "#5a12d6",
   },
   btnText: { fontSize: 20, color: '#f8f9ff', fontWeight: 'bold' },
   btnStart: { backgroundColor: "#216161" },

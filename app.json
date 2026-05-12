@@ -8,7 +8,7 @@
     "scheme": "rowingmaptracker",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/android-icon-foreground.png",
+      "image": "./assets/images/splash-rmp.png",
       "resizeMode": "cover",
       "backgroundColor": "#ffffff",
       "dark": {
