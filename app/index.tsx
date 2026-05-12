@@ -10,10 +10,15 @@ import EventCard from "./components/EventCard";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(true); // État pour indiquer le chargement/la synchronisation
-  const [isCodeValid, setIsCodeValid] = useState(true); // État pour indiquer si le code participant est valide
+  const [isCodeValid, setIsCodeValid] = useState(false); // État pour indiquer si le code participant est valide (pour le modal)
 
   const [dbEvents, setDbEvents] = useState<DbRaceEvent[] | null>([]);
+  // phoneRpKeys n'est pas strictement nécessaire ici si EventCard gère ses propres clés via fetch,
+  // mais est utile pour la logique d'existence dans syncApiRaceEventsToLocalDb
   const [phoneRpKeys, setPhoneRpKeys] = useState<DbPhoneRpKey[] | null>([]);
+
+  // État pour déclencher le rafraîchissement des EventCards
+  const [refreshEventCardsTrigger, setRefreshEventCardsTrigger] = useState(0);
 
   // État pour le contenu de l'input du code participant
   const [participantCode, setParticipantCode] = useState("");
@@ -22,28 +27,33 @@ const Index = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   // Fonction pour récupérer les événements de l'API et les synchroniser avec la DB locale
-  const syncApiRaceEventsToLocalDb = async (participantCode: string) => {
+  // Retourne true si le codeToCheck a trouvé une correspondance, false sinon ou en cas d'erreur
+  const syncApiRaceEventsToLocalDb = async (codeToCheck: string): Promise<boolean> => {
     try {
       const apiURL = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${apiURL}/raceevents/forkeys/${codeToCheck}`);
 
-      const response = await fetch(`${apiURL}/raceevents/forkeys/${participantCode}`);
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error(`API Error (raceevents/forkeys): ${response.status} ${response.statusText}`, errorBody);
+        throw new Error(`Failed to fetch race events: ${response.status} ${response.statusText}`);
+      }
 
       const data = await response.json();
+      const apiRaceEvents: RaceEvent[] = data.raceevents;
 
-      // Préparer toutes les opérations d'insertion/mise à jour en parallèle
-      const syncPromises = data.raceevents.map(async (event: RaceEvent) => {
+      // Récupérer une liste fraîche des clés de participant avant de commencer la synchronisation
+      // pour éviter des conflits ou des états obsolètes.
+      const currentPhoneRpKeys = await getPhoneRpKeys();
+      setPhoneRpKeys(currentPhoneRpKeys); // Met à jour le state local de Index si nécessaire
 
-        // Si le code participant est fourni, vérifier s'il correspond à l'un des événements récupérés
-        if (participantCode.trim() !== "") {
-          const isCodeValidForEvent = data.raceevents.some((e: RaceEvent) => e.my_rp_key === participantCode);
-          if (!isCodeValidForEvent) {
-            console.warn(`Le code participant "${participantCode}" n'est associé à aucun événement récupéré. Ignoring this code for synchronization.`);
-            setIsCodeValid(false);
-          } else {
-            setIsCodeValid(true);
-          }
-        }
+      let foundMatchingCode = false;
+      if (codeToCheck.trim() !== "" && codeToCheck !== "____") { // "____" est votre code initial de placeholder
+        foundMatchingCode = apiRaceEvents.some((e: RaceEvent) => e.my_rp_key === codeToCheck);
+      }
+      // isCodeValid n'est PLUS mis à jour ici. La fonction renvoie la validité.
 
+      const syncPromises = apiRaceEvents.map(async (event: RaceEvent) => {
         // Validation de re_event_visibility (doit être 0 ou 1)
         const visibility = (event.re_event_visibility >= 0 && event.re_event_visibility <= 1) ? event.re_event_visibility : 1;
 
@@ -96,25 +106,20 @@ const Index = () => {
             console.log(`Event with ID ${event.re_id} added.`);
           }
 
-          // Ajouter la clé de participant à la table phone_rp_keys si elle n'existe pas déjà et si elle est valide
-          if (event.my_rp_key && event.my_rp_key != null && event.my_rp_key.length === 4 && phoneRpKeys != null) {
-            const existingKey = phoneRpKeys.find(key => key.prk_rp_key === event.my_rp_key);
+          // Ajouter/Mettre à jour la clé de participant à la table phone_rp_keys si elle n'existe pas déjà et si elle est valide
+          if (event.my_rp_key && event.my_rp_key.length === 4) {
+            const existingKey = currentPhoneRpKeys?.find(key => key.prk_rp_key === event.my_rp_key);
             if (!existingKey) {
               await addPhoneRpKey(event.my_rp_key, event.re_id, event.re_event_end_date_and_time);
+              console.log(`Added new phone RP key: ${event.my_rp_key}`);
             } else {
+              // Mettre à jour la date d'expiration si la clé existe déjà
               await updatePhoneRpKey(event.re_id, event.re_event_end_date_and_time, event.my_rp_key);
+              console.log(`Updated phone RP key: ${event.my_rp_key}`);
             }
           }
         } catch (error) {
           console.error(`Error syncing event ${event.re_id} to local database:`, error);
-          throw error; // Propager l'erreur pour que Promise.allSettled la capture
-        }
-
-        try {
-          // Retourner la liste mise à jour des clés de participant après chaque synchronisation d'événement
-          setPhoneRpKeys(await getPhoneRpKeys());
-        } catch (error) {
-          console.error("Error retrieving phone RP keys after syncing event:", error);
           throw error; // Propager l'erreur pour que Promise.allSettled la capture
         }
       });
@@ -125,14 +130,16 @@ const Index = () => {
       // Log des résultats pour le débogage
       results.forEach((result, index) => {
         if (result.status === 'rejected') {
-          console.error(`Synchronisation de l'événement ${data.raceevents[index]?.re_id} échouée:`, result.reason);
+          console.error(`Synchronisation de l'événement ${apiRaceEvents[index]?.re_id} échouée:`, result.reason);
         }
       });
 
       console.log("Synchronisation des événements terminée.");
-
+      return foundMatchingCode; // Retourne la validité du code
     } catch (error) {
       console.error("Error fetching or syncing race events:", error);
+      Alert.alert("Erreur de synchronisation", "Impossible de récupérer les événements. Veuillez vérifier votre connexion.");
+      return false; // Retourne false en cas d'erreur
     }
   };
 
@@ -151,7 +158,7 @@ const Index = () => {
     }
   };
 
-  // Initialisation de la base de données et synchronisation des événements
+  // Initialisation de la base de données et synchronisation des événements au montage du composant
   useEffect(() => {
     const initializeAndSync = async () => {
       try {
@@ -161,18 +168,17 @@ const Index = () => {
         // Supprimer les clés de participant expirées avant de charger les événements
         await deleteExpiredPhoneRpKeys();
         console.log("Expired phone RP keys deleted.");
-        // Charger les clés de participant depuis la base de données locale
-        const keys = await getPhoneRpKeys();
-        setPhoneRpKeys(keys);
-        console.log("Phone RP keys loaded:", keys);
         // Synchronisation initiale avec un code vide ou par défaut pour charger les événements sans code spécifique
-        await syncApiRaceEventsToLocalDb("____");
+        await syncApiRaceEventsToLocalDb("____"); // Votre placeholder pour charger les événements par défaut
         console.log("API events synced to local database.");
         // Charger les événements locaux après la synchronisation
         await loadLocalRaceEvents();
         console.log("Local events loaded into state.");
+        // Déclencher un rafraîchissement initial pour les EventCards
+        setRefreshEventCardsTrigger(prev => prev + 1);
       } catch (error) {
-        console.error("Database initialization failed:", error);
+        console.error("Database initialization or initial sync failed:", error);
+        Alert.alert("Erreur", "Problème d'initialisation de l'application. Réessayez.");
       } finally {
         setIsLoading(false);
       }
@@ -185,34 +191,45 @@ const Index = () => {
   // LOGIQUE DU MODAL ET DE L'INPUT DU CODE PARTICIPANT
   // ===================================================================
   const handleParticipantCodeSubmit: () => Promise<void> = async () => {
-    if (participantCode.trim() === "") return;
+    if (participantCode.trim().length !== 4) {
+      Alert.alert("Erreur", "Veuillez entrer un code participant de 4 caractères.");
+      return;
+    }
 
     try {
-      console.log(`Tentative d'accès avec le code: ${participantCode}`);
+      setIsLoading(true); // Afficher l'indicateur de chargement pendant la soumission
+      // Capture la valeur retournée par la fonction pour savoir si le code était valide
+      const codeWasValid = await syncApiRaceEventsToLocalDb(participantCode.trim());
+      await loadLocalRaceEvents(); // Recharger les événements locaux pour inclure les nouveaux
+      setRefreshEventCardsTrigger(prev => prev + 1); // Déclencher le rafraîchissement des EventCards
 
-      await syncApiRaceEventsToLocalDb(participantCode);
-      console.log("API events synced to local database.");
-      await loadLocalRaceEvents();
-      console.log("Local events loaded into state.");
+      // MAINTENANT, mettre à jour l'état isCodeValid et la logique en fonction du résultat
+      setIsCodeValid(codeWasValid); // Ceci met à jour l'état pour l'affichage du modal
 
-      setTimeout(() => {
-        // Réinitialiser l'état de validité du code à chaque soumission
-        setIsCodeValid(false);
-        // Réinitialiser le champ de saisie du code participant
-        setParticipantCode("");
-        // Fermer le modal après la soumission
-        setIsModalVisible(false);
-      }, 3000); // Délai pour permettre à l'utilisateur de voir les événements associés avant de réinitialiser le champ
+      if (codeWasValid) {
+        setTimeout(() => {
+          setIsModalVisible(false); // Fermer le modal
+          setParticipantCode(""); // Réinitialiser l'input
+          setIsCodeValid(false); // Réinitialiser pour la prochaine ouverture du modal
+        }, 3000); // Délai pour permettre à l'utilisateur de voir le message de succès
+      } else {
+        // Si le code n'était pas valide (aucune correspondance), alerter l'utilisateur
+        Alert.alert("Code invalide", "Le code participant entré n'est associé à aucun événement ou n'est pas valide.");
+        // Pas besoin de setIsCodeValid(false) ici, car c'est déjà la valeur actuelle
+      }
 
-      console.log("Participant code submitted and processed successfully. ", phoneRpKeys);
+      console.log("Participant code submitted and processed.");
     } catch (error) {
       console.error("Error during participant code submission:", error);
       Alert.alert("Erreur", "Une erreur est survenue lors de la soumission du code. Veuillez réessayer.");
+      setIsCodeValid(false); // S'assurer que l'état est correct en cas d'erreur
+    } finally {
+      setIsLoading(false); // Cacher l'indicateur de chargement
     }
   };
 
   const renderItem = ({ item }: { item: DbRaceEvent }) => {
-    return <EventCard event={item} />;
+    return <EventCard event={item} onRefreshTrigger={refreshEventCardsTrigger} />;
   };
 
   if (isLoading) {
@@ -234,7 +251,7 @@ const Index = () => {
         contentContainerStyle={{ padding: 10 }}
       />
       {/* Bouton déclencheur de la modale */}
-      <Pressable style={styles.button} onPress={() => setIsModalVisible(true)}>
+      <Pressable style={styles.button} onPress={() => { setIsModalVisible(true); setIsCodeValid(false); /* Réinitialiser l'état du modal à l'ouverture */ setParticipantCode(""); }}>
         <Text style={styles.buttonText}><Ionicons name="grid" size={20} color="#ffffff" /> Entrez votre code</Text>
       </Pressable>
 
@@ -246,6 +263,8 @@ const Index = () => {
         onRequestClose={() => {
           // Fermer le modal si l'utilisateur appuie sur le bouton retour du système
           setIsModalVisible(false);
+          setParticipantCode(""); // Réinitialiser le champ
+          setIsCodeValid(false); // Réinitialiser la validité pour la prochaine ouverture
         }}
       >
         <View style={styles.centeredView}>
@@ -254,41 +273,46 @@ const Index = () => {
             <Text style={styles.modalTitle}>Code participant</Text>
             <Text style={styles.text}>Entrez votre code participant de 4 caractères</Text>
 
-            {/* Input du code */}
-            {!isCodeValid && (
-              <TextInput
-                style={styles.inputCode}
-                placeholder="----"
-                value={participantCode}
-                onChangeText={(text) => setParticipantCode(text)}
-                autoCapitalize='characters'
-                maxLength={4}
-              />
-            )}
-
-            {/* Bouton de soumission */}
-            {!isCodeValid && (
-              <Pressable
-                style={[styles.button, { marginTop: 20 }]}
-                onPress={handleParticipantCodeSubmit}
-                disabled={!participantCode.trim()} // Désactiver si le champ est vide
-              >
-                <Text style={styles.buttonText}>Valider</Text>
-              </Pressable>
-            )}
-
-            {isCodeValid && (
+            {/* Input du code ou message de succès */}
+            {!isCodeValid ? ( // Affiche l'input et le bouton si le code n'est pas (encore) valide
+              <>
+                <TextInput
+                  style={styles.inputCode}
+                  placeholder="----"
+                  value={participantCode}
+                  onChangeText={(text) => setParticipantCode(text)}
+                  autoCapitalize='characters'
+                  maxLength={4}
+                />
+                <Pressable
+                  style={[styles.button, { marginTop: 20 }]}
+                  onPress={handleParticipantCodeSubmit}
+                  disabled={participantCode.trim().length !== 4 || isLoading} // Désactiver si le champ est vide ou si déjà en chargement
+                >
+                  {isLoading ? ( // Afficher un ActivityIndicator dans le bouton si en chargement
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Valider</Text>
+                  )}
+                </Pressable>
+              </>
+            ) : ( // Affiche le message de succès si le code est valide
               <View style={{ alignItems: 'center' }}>
                 <Text><Ionicons name="checkmark-circle" size={80} color="#26ae11" /></Text>
-                <Text style={{ color: '#555', fontSize: 14, marginTop: 10, textAlign: 'center', marginBottom: 20 }}>Fermez ce message pour voir les événements associés à votre code.</Text>
+                <Text style={{ color: '#555', fontSize: 14, marginTop: 10, textAlign: 'center', marginBottom: 20 }}>Votre code a été traité. Fermez ce message pour voir les événements associés.</Text>
+                {/* Bouton de fermeture spécifique pour le message de succès */}
+                <Pressable onPress={() => { setIsModalVisible(false); setParticipantCode(""); setIsCodeValid(false); }} style={styles.closeButtonSuccess}>
+                  <Text style={{color: '#fff', fontWeight: 'bold'}}>Fermer</Text>
+                </Pressable>
               </View>
             )}
 
-
-            {/* Bouton de fermeture */}
-            <Pressable onPress={() => setIsModalVisible(false)}>
-              <Text style={styles.closeButton}>Fermer</Text>
-            </Pressable>
+            {/* Bouton de fermeture global du modal - visible seulement si le message de succès n'est PAS affiché */}
+            {!isCodeValid && (
+                <Pressable onPress={() => { setIsModalVisible(false); setParticipantCode(""); setIsCodeValid(false); }} style={styles.closeButton}>
+                    <Text style={{color: '#999'}}>Annuler</Text>
+                </Pressable>
+            )}
           </View>
         </View>
       </Modal>
@@ -297,7 +321,7 @@ const Index = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
+  container: {
     flex: 1,
     backgroundColor: "#E3E5E7",
     paddingVertical: 40,
@@ -314,7 +338,7 @@ const styles = StyleSheet.create({
     color: "#f5f7ff",
     borderRadius: 8,
   },
-  card: {
+  card: { // Styles pour les EventCard (peut-être redondant ici, si EventCard a ses propres styles)
     backgroundColor: "#f5f7ff",
     padding: 15,
     borderRadius: 12,
@@ -355,11 +379,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   loadingContainer: {
     flex: 1,
@@ -390,6 +409,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    minWidth: 300, // Assure une largeur minimale pour la modale
   },
   modalTitle: {
     width: 300,
@@ -419,12 +439,18 @@ const styles = StyleSheet.create({
     borderColor: '#999',
     borderRadius: 8,
     color: '#999',
-    padding: 10,
-    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginTop: 20,
     fontSize: 16,
-  }
+  },
+  closeButtonSuccess: { // Style pour le bouton "Fermer" quand le message de succès est affiché
+    backgroundColor: '#216161',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 10,
+  },
 });
 
 export default Index;
-
-

@@ -13,7 +13,7 @@ import { WebView } from 'react-native-webview';
 const MIN_DISTANCE: number = 0.005;
 const MIN_SPEED_DISTANCE: number = 0.01;
 const MAX_SPEED: number = 200; // Change to 50 in production
-const MAX_ACCURACY: number = 5;
+const MAX_ACCURACY: number = 30;
 const LOCATION_UPDATE_INTERVAL: number = 2000; // Fréquence de mise à jour bdd ou api en ms
 const LOCATION_TASK_NAME = 'background-location-task'; // Nom unique pour la tâche
 
@@ -111,12 +111,14 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
 
     if (storedParticipantId && storedParticipantKey) {
-      await globalSaveParticipantPosition(
-        parseInt(storedParticipantId),
-        storedParticipantKey,
-        latestLocation.coords.latitude,
-        latestLocation.coords.longitude
-      );
+      for (const location of locations) {
+        await globalSaveParticipantPosition(
+          parseInt(storedParticipantId),
+          storedParticipantKey,
+          location.coords.latitude,
+          location.coords.longitude
+        );
+      }
     } else {
       console.warn('Participant ID or Key not found in AsyncStorage for background task. Cannot save position.');
     }
@@ -195,59 +197,59 @@ export default function Tracker() {
 
       // Si le tracking était déjà actif, on peut tenter de récupérer le temps de début
       if (isTaskActive) {
-          const storedStartTime = await AsyncStorage.getItem(ASYNC_STORAGE_START_TIME);
-          if (storedStartTime) {
-              startTimeRef.current = parseInt(storedStartTime);
-              // Lancer le timer pour le temps écoulé si le tracking est actif
-              timerRef.current = setInterval(() => {
-                if (startTimeRef.current) {
-                  setTimeElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
-                }
-              }, 1000) as unknown as NodeJS.Timeout;
-          }
-          console.log("Background location task was active. UI state might not reflect actual path/distance without persistence load.");
-
-          // Lancer un watchPositionAsync juste pour mettre à jour l'UI en premier plan
-          locationSubscription.current = await Location.watchPositionAsync(
-            {
-              accuracy: Location.Accuracy.High,
-              timeInterval: 1000,
-              distanceInterval: 1
-            },
-            (location) => {
-              const { latitude, longitude, accuracy } = location.coords;
-              if (accuracy != null && accuracy > MAX_ACCURACY) return;
-
-              const now = location.timestamp;
-              const newPoint = { latitude, longitude };
-
-              setPath(prev => {
-                if (prev.length === 0) return [newPoint];
-                const last = prev[prev.length - 1];
-                const d = calculateDistance(last.latitude, last.longitude, latitude, longitude);
-                if (d < MIN_DISTANCE) return prev;
-
-                let speed = 0;
-                if (lastTimestamp.current) {
-                  const dt = (now - lastTimestamp.current) / 1000;
-                  if (dt > 0) speed = (d / dt) * 3600;
-                }
-                lastTimestamp.current = now;
-                if (speed > MAX_SPEED) return prev;
-
-                setCurrentSpeed(prev => prev * 0.7 + speed * 0.3);
-                if (speed > 1) {
-                  const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
-                  const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
-                  lastBearing.current = smoothBearing;
-                  setBearing(smoothBearing);
-                }
-                setDistance(dist => dist + d);
-                return [...prev, newPoint];
-              });
-              setCurrentLocation(newPoint);
+        const storedStartTime = await AsyncStorage.getItem(ASYNC_STORAGE_START_TIME);
+        if (storedStartTime) {
+          startTimeRef.current = parseInt(storedStartTime);
+          // Lancer le timer pour le temps écoulé si le tracking est actif
+          timerRef.current = setInterval(() => {
+            if (startTimeRef.current) {
+              setTimeElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
             }
-          );
+          }, 1000) as unknown as NodeJS.Timeout;
+        }
+        console.log("Background location task was active. UI state might not reflect actual path/distance without persistence load.");
+
+        // Lancer un watchPositionAsync juste pour mettre à jour l'UI en premier plan
+        locationSubscription.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 1000,
+            distanceInterval: 5
+          },
+          (location) => {
+            const { latitude, longitude, accuracy } = location.coords;
+            if (accuracy != null && accuracy > MAX_ACCURACY) return;
+
+            const now = location.timestamp;
+            const newPoint = { latitude, longitude };
+
+            setPath(prev => {
+              if (prev.length === 0) return [newPoint];
+              const last = prev[prev.length - 1];
+              const d = calculateDistance(last.latitude, last.longitude, latitude, longitude);
+              if (d < MIN_DISTANCE) return prev;
+
+              let speed = 0;
+              if (lastTimestamp.current) {
+                const dt = (now - lastTimestamp.current) / 1000;
+                if (dt > 0) speed = (d / dt) * 3600;
+              }
+              lastTimestamp.current = now;
+              if (speed > MAX_SPEED) return prev;
+
+              setCurrentSpeed(prev => prev * 0.7 + speed * 0.3);
+              if (speed > 1) {
+                const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
+                const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
+                lastBearing.current = smoothBearing;
+                setBearing(smoothBearing);
+              }
+              setDistance(dist => dist + d);
+              return [...prev, newPoint];
+            });
+            setCurrentLocation(newPoint);
+          }
+        );
       }
     };
 
@@ -345,13 +347,13 @@ export default function Tracker() {
     // Ne met à jour la WebView que si l'application est en premier plan
     // et que le ref de la webview est disponible.
     if (AppState.currentState === 'active' && webviewRef.current) {
-        webviewRef.current?.postMessage(JSON.stringify({
-            lat: currentLocation.latitude,
-            lng: currentLocation.longitude,
-            path,
-            bearing,
-            follow: true
-        }));
+      webviewRef.current?.postMessage(JSON.stringify({
+        lat: currentLocation.latitude,
+        lng: currentLocation.longitude,
+        path,
+        bearing,
+        follow: true
+      }));
     }
   }, [currentLocation, path, bearing]);
 
@@ -387,13 +389,16 @@ export default function Tracker() {
       await AsyncStorage.setItem(ASYNC_STORAGE_RP_KEY, raceParticipantKey as string);
 
       await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-        accuracy: Location.Accuracy.BestForNavigation,
-        distanceInterval: 1, // Mètres
+        accuracy: Location.Accuracy.High,
+        distanceInterval: 5, // Mètres
         timeInterval: LOCATION_UPDATE_INTERVAL, // Millisecondes
+        deferredUpdatesInterval: 5000,
+        deferredUpdatesDistance: 5,
         foregroundService: {
           notificationTitle: 'Tracking de la course',
           notificationBody: `Votre position est partagée pour l'événement ${raceEventId} et participant ${raceParticipantKey}.`,
           notificationColor: '#216161',
+          killServiceOnDestroy: false,
         },
         activityType: Location.ActivityType.OtherNavigation,
         pausesUpdatesAutomatically: false,
@@ -407,7 +412,7 @@ export default function Tracker() {
         {
           accuracy: Location.Accuracy.High,
           timeInterval: 1000,
-          distanceInterval: 1
+          distanceInterval: 5
         },
         (location) => {
           const { latitude, longitude, accuracy } = location.coords;
@@ -469,8 +474,8 @@ export default function Tracker() {
     try {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
       if (locationSubscription.current) {
-          locationSubscription.current.remove();
-          locationSubscription.current = null;
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
       }
       if (timerRef.current) {
         clearInterval(timerRef.current);
