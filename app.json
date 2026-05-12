@@ -8,7 +8,7 @@
     "scheme": "rowingmaptracker",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/splash-rmp.png",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "cover",
       "backgroundColor": "#ffffff",
       "dark": {
@@ -60,7 +60,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#232323",
-          "image": "./assets/images/android-icon-foreground.png",
+          "image": "./assets/images/splash-icon.png",
           "resizeMode": "cover"
         }
       ],
