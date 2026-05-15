@@ -118,20 +118,17 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
 
     if (storedParticipantId && storedParticipantKey) {
-      for (const location of locations) {
         await globalSaveParticipantPosition(
           parseInt(storedParticipantId),
           storedParticipantKey,
-          location.coords.latitude,
-          location.coords.longitude
+          latestLocation.coords.latitude,
+          latestLocation.coords.longitude
         );
-      }
     } else {
       console.warn('Participant ID or Key not found in AsyncStorage for background task. Cannot save position.');
     }
   }
 });
-
 
 export default function Tracker() {
 
