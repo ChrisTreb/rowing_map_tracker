@@ -118,12 +118,12 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
 
     if (storedParticipantId && storedParticipantKey) {
-        await globalSaveParticipantPosition(
-          parseInt(storedParticipantId),
-          storedParticipantKey,
-          latestLocation.coords.latitude,
-          latestLocation.coords.longitude
-        );
+      await globalSaveParticipantPosition(
+        parseInt(storedParticipantId),
+        storedParticipantKey,
+        latestLocation.coords.latitude,
+        latestLocation.coords.longitude
+      );
     } else {
       console.warn('Participant ID or Key not found in AsyncStorage for background task. Cannot save position.');
     }
@@ -542,9 +542,11 @@ export default function Tracker() {
         />
       </View>
 
+      {/*
       <TouchableOpacity onPress={openBatteryOptimizationSettings} style={styles.btnBattery}>
         <Text style={styles.btnText}><Ionicons name="flash" size={26} color="white" /> Désactiver l'optimisation batterie</Text>
       </TouchableOpacity>
+      */}
 
       {!isTracking ? (
         <TouchableOpacity onPress={startTracking} style={[styles.btn, styles.btnStart]}>
@@ -594,7 +596,6 @@ export default function Tracker() {
   );
 };
 
-// ... Styles restent inchangés ...
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E3E5E7', paddingVertical: 40, paddingHorizontal: 10 },
 
