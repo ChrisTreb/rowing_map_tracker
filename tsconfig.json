@@ -3,15 +3,18 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
-    }
+      "@/*": ["./*"]
+    },
+    "allowJs": true, // Permet au compilateur TypeScript de traiter les fichiers JavaScript.
+    "checkJs": true // Active la vérification de type pour les fichiers JavaScript via JSDoc.
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    "**/*.js", // Inclure les fichiers JavaScript
+    "**/*.jsx", // Inclure les fichiers JSX
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    "types/**/*.ts" // Inclure explicitement votre dossier de types, si ce n'est pas déjà couvert par "**/*.ts"
   ]
 }
