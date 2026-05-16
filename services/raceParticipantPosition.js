@@ -5,35 +5,35 @@ import { getDb } from './database';
  * @typedef {object} DbRaceParticipantPosition
  * @property {number} rpp_id
  * @property {number} rpp_rp_id
- * @property {number} rp_date
- * @property {number} rpp_viewport_latitude
- * @property {number} rpp_viewport_longitude
+ * @property {string} rpp_rp_key
+ * @property {number} rpp_date
+ * @property {number} rpp_latitude
+ * @property {number} rpp_longitude
  */
 
 /**
  * Ajoute une nouvelle position de participant de course à la base de données.
- * @param {number} rpp_id L'ID de la position, généré en externe.
  * @param {number} rpp_rp_id L'ID du participant de course associé.
- * @param {number} rp_date Le timestamp de la position.
- * @param {number} rpp_viewport_latitude La latitude de la position.
- * @param {number} rpp_viewport_longitude La longitude de la position.
- * @returns {Promise<number>} L'ID de la position ajoutée.
+ * @param {string} rpp_rp_key La clé du participant de la course.
+ * @param {number} rpp_date Le timestamp de la position.
+ * @param {number} rpp_latitude La latitude de la position.
+ * @param {number} rpp_longitude La longitude de la position.
+ * @returns {Promise<Void>} L'ID de la position ajoutée.
  */
 export const addRaceParticipantPosition = async (
-  rpp_id,
   rpp_rp_id,
-  rp_date,
-  rpp_viewport_latitude,
-  rpp_viewport_longitude
+  rpp_rp_key,
+  rpp_date,
+  rpp_latitude,
+  rpp_longitude
 ) => {
   try {
     const db = getDb();
     await db.runAsync(
-      `INSERT INTO race_participant_position (rpp_id, rpp_rp_id, rp_date, rpp_viewport_latitude, rpp_viewport_longitude) VALUES (?, ?, ?, ?, ?)`,
-      [rpp_id, rpp_rp_id, rp_date, rpp_viewport_latitude, rpp_viewport_longitude]
+      `INSERT INTO race_participant_position (rpp_rp_id, rpp_rp_key, rpp_date, rpp_latitude, rpp_longitude) VALUES (?, ?, ?, ?, ?)`,
+      [rpp_rp_id, rpp_rp_key, rpp_date, rpp_latitude, rpp_longitude]
     );
-    console.log("Race participant position added:", rpp_id);
-    return rpp_id;
+    console.log("Race participant position added for participant ID:", rpp_rp_id);
   } catch (error) {
     console.error("Error adding race participant position:", error);
     throw error;
@@ -41,16 +41,16 @@ export const addRaceParticipantPosition = async (
 };
 
 /**
- * Récupère toutes les positions d'un participant par l'ID du participant.
- * @param {number} rp_id L'ID du participant de course.
+ * Récupère toutes les positions d'un participant par l'ID du participant pour une clé utilisée.
+ * @param {string} rpp_rp_key La clé de la course utilisée par le participant.
  * @returns {Promise<DbRaceParticipantPosition[]>} Un tableau d'objets DbRaceParticipantPosition.
  */
-export const getRaceParticipantPositionsByParticipantId = async (rp_id) => {
+export const getRaceParticipantPositionsByParticipantKey = async (rpp_rp_key) => {
   try {
     const db = getDb();
     const result = await db.getAllAsync(
-      `SELECT * FROM race_participant_position WHERE rpp_rp_id = ? ORDER BY rp_date ASC`,
-      [rp_id]
+      `SELECT * FROM race_participant_position WHERE rpp_rp_key = ? ORDER BY rpp_date ASC`,
+      [rpp_rp_key]
     );
     return /** @type {DbRaceParticipantPosition[]} */ (result);
   } catch (error) {
@@ -61,15 +61,15 @@ export const getRaceParticipantPositionsByParticipantId = async (rp_id) => {
 
 /**
  * Supprime toutes les positions d'un participant par l'ID du participant.
- * @param {number} rp_id L'ID du participant de course.
+ * @param {number} rpp_rp_id L'ID du participant de course.
  * @returns {Promise<void>} Une promesse qui se résout lorsque les positions sont supprimées.
  */
-export const deleteRaceParticipantPositionsByParticipantId = async (rp_id) => {
+export const deleteRaceParticipantPositionsByParticipantId = async (rpp_rp_id) => {
   try {
     const db = getDb();
     await db.runAsync(
       `DELETE FROM race_participant_position WHERE rpp_rp_id = ?`,
-      [rp_id]
+      [rpp_rp_id]
     );
   } catch (error) {
     console.error("Error deleting race participant positions by participant ID:", error);
