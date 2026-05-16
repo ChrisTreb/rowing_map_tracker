@@ -32,10 +32,7 @@ const MAX_ACCURACY = 30;
 const LOCATION_UPDATE_INTERVAL = 10000;
 const LOCATION_DISTANCE_INTERVAL = 10;
 
-const INIT_LOCATION: Position = {
-  latitude: 48.39,
-  longitude: -4.48,
-};
+const INIT_LOCATION: Position = {latitude: 48.39, longitude: -4.48};
 
 const apiURL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -46,7 +43,6 @@ const apiURL = process.env.EXPO_PUBLIC_API_URL;
 const ASYNC_STORAGE_RP_ID = 'rp_id';
 const ASYNC_STORAGE_RP_KEY = 'rp_key';
 const ASYNC_STORAGE_START_TIME = 'tracking_start_time';
-
 const ASYNC_STORAGE_LAST_BG_POSITION = 'last_bg_position';
 
 // ======================================================
@@ -69,16 +65,11 @@ const getBearing = (
 ) => {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const toDeg = (rad: number) => (rad * 180) / Math.PI;
-
   const φ1 = toRad(lat1);
   const φ2 = toRad(lat2);
   const Δλ = toRad(lon2 - lon1);
-
   const y = Math.sin(Δλ) * Math.cos(φ2);
-
-  const x =
-    Math.cos(φ1) * Math.sin(φ2) -
-    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
 
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 };
@@ -93,7 +84,6 @@ const calculateDistance = (
 
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
-
   const Δφ = ((lat2 - lat1) * Math.PI) / 180;
   const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
@@ -135,10 +125,7 @@ const globalSaveParticipantPosition = async (
   }
 
   try {
-    const participantPosition = new ClassPosition(
-      latitude,
-      longitude
-    );
+    const participantPosition = new ClassPosition(latitude, longitude);
 
     const response = await fetch(
       `${apiURL}/position/${rpp_rp_key}`,
@@ -184,31 +171,20 @@ TaskManager.defineTask(
 
       // IMPORTANT
       // prendre la plus récente
-      const latestLocation =
-        locations[locations.length - 1];
+      const latestLocation = locations[locations.length - 1];
 
-      const {
-        latitude,
-        longitude,
-        accuracy,
-      } = latestLocation.coords;
+      const {latitude, longitude, accuracy} = latestLocation.coords;
 
       const timestamp = latestLocation.timestamp;
 
       // Accuracy filter
-      if (
-        accuracy != null &&
-        accuracy > MAX_ACCURACY
-      ) {
+      if (accuracy != null && accuracy > MAX_ACCURACY) {
         console.log('IGNORED BAD ACCURACY');
         return;
       }
 
       // Last position
-      const lastPositionRaw =
-        await AsyncStorage.getItem(
-          ASYNC_STORAGE_LAST_BG_POSITION
-        );
+      const lastPositionRaw = await AsyncStorage.getItem(ASYNC_STORAGE_LAST_BG_POSITION);
 
       if (lastPositionRaw) {
         const lastPosition = JSON.parse(lastPositionRaw);
@@ -244,30 +220,13 @@ TaskManager.defineTask(
       }
 
       // save last valid position
-      await AsyncStorage.setItem(
-        ASYNC_STORAGE_LAST_BG_POSITION,
-        JSON.stringify({
-          latitude,
-          longitude,
-          timestamp,
-        })
-      );
+      await AsyncStorage.setItem(ASYNC_STORAGE_LAST_BG_POSITION, JSON.stringify({latitude, longitude, timestamp}));
 
-      const storedParticipantId =
-        await AsyncStorage.getItem(
-          ASYNC_STORAGE_RP_ID
-        );
+      const storedParticipantId = await AsyncStorage.getItem(ASYNC_STORAGE_RP_ID);
+      const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
 
-      const storedParticipantKey =
-        await AsyncStorage.getItem(
-          ASYNC_STORAGE_RP_KEY
-        );
-
-      if (
-        !storedParticipantId ||
-        !storedParticipantKey
-      ) {
-        console.warn('MISSING PARTICIPANT DATA');
+      if (!storedParticipantId || !storedParticipantKey) {
+        console.error('MISSING PARTICIPANT DATA');
         return;
       }
 
@@ -288,12 +247,7 @@ TaskManager.defineTask(
 // ======================================================
 
 export default function Tracker() {
-  const {
-    id,
-    eventId,
-    participantId,
-    participantKey,
-  } = useLocalSearchParams();
+  const {id, eventId, participantId, participantKey} = useLocalSearchParams();
 
   const raceId = parseInt(id as string);
   const raceEventId = parseInt(eventId as string);
@@ -341,7 +295,6 @@ export default function Tracker() {
           'Permission refusée',
           'Permission GPS nécessaire'
         );
-
         return;
       }
 
@@ -399,11 +352,7 @@ export default function Tracker() {
           distanceInterval: 5,
         },
         (location) => {
-          const {
-            latitude,
-            longitude,
-            accuracy,
-          } = location.coords;
+          const {latitude, longitude, accuracy} = location.coords;
 
           if (
             accuracy != null &&
@@ -413,11 +362,7 @@ export default function Tracker() {
           }
 
           const now = location.timestamp;
-
-          const newPoint = {
-            latitude,
-            longitude,
-          };
+          const newPoint = {latitude, longitude};
 
           setPath((prev) => {
             if (prev.length === 0) {
@@ -459,17 +404,9 @@ export default function Tracker() {
             );
 
             if (speed > 1) {
-              const raw = getBearing(
-                last.latitude,
-                last.longitude,
-                latitude,
-                longitude
-              );
-
+              const raw = getBearing(last.latitude, last.longitude, latitude, longitude);
               const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
-
               lastBearing.current = smoothBearing;
-
               setBearing(smoothBearing);
             }
 
@@ -499,7 +436,6 @@ export default function Tracker() {
           'Tracking',
           'Déjà démarré'
         );
-
         return;
       }
 
@@ -512,20 +448,10 @@ export default function Tracker() {
 
       startTimeRef.current = Date.now();
 
-      await AsyncStorage.setItem(
-        ASYNC_STORAGE_START_TIME,
-        startTimeRef.current.toString()
-      );
+      await AsyncStorage.setItem(ASYNC_STORAGE_START_TIME, startTimeRef.current.toString());
+      await AsyncStorage.setItem(ASYNC_STORAGE_RP_ID, raceParticipantId.toString());
 
-      await AsyncStorage.setItem(
-        ASYNC_STORAGE_RP_ID,
-        raceParticipantId.toString()
-      );
-
-      await AsyncStorage.setItem(
-        ASYNC_STORAGE_RP_KEY,
-        raceParticipantKey
-      );
+      await AsyncStorage.setItem(ASYNC_STORAGE_RP_KEY, raceParticipantKey);
 
       timerRef.current = setInterval(() => {
         if (startTimeRef.current) {
@@ -559,20 +485,12 @@ export default function Tracker() {
       );
 
       await startForegroundWatcher();
-
       setIsTracking(true);
+      Alert.alert('Tracking démarré', 'Le tracking GPS est actif');
 
-      Alert.alert(
-        'Tracking démarré',
-        'Le tracking GPS est actif'
-      );
     } catch (e) {
       console.error(e);
-
-      Alert.alert(
-        'Erreur',
-        'Impossible de démarrer le tracking'
-      );
+      Alert.alert('Erreur', 'Impossible de démarrer le tracking');
     }
   };
 
@@ -625,10 +543,7 @@ export default function Tracker() {
   // ======================================================
 
   useEffect(() => {
-    if (
-      AppState.currentState === 'active' &&
-      webviewRef.current
-    ) {
+    if ( AppState.currentState === 'active' && webviewRef.current) {
       webviewRef.current.postMessage(
         JSON.stringify({
           lat: currentLocation.latitude,
@@ -657,20 +572,16 @@ export default function Tracker() {
         body {
           margin: 0;
         }
-
         #map {
           height: 100vh;
         }
-
         .marker-wrapper {
           width: 40px;
           height: 40px;
-
           display: flex;
           align-items: center;
           justify-content: center;
         }
-
         .gps-arrow {
           filter: drop-shadow(0 2px 5px rgba(0,0,0,0.4));
           transform-origin: center center;
@@ -686,14 +597,9 @@ export default function Tracker() {
       <script>
         var map = L.map('map').setView([48.39, -4.48], 15);
 
-        L.tileLayer(
-          'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png'
-        ).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png').addTo(map);
 
-        var polyline = L.polyline([], {
-          color: '#4266f5',
-          weight: 5
-        }).addTo(map);
+        var polyline = L.polyline([], {color: '#4266f5', weight: 5}).addTo(map);
 
         var marker = null;
 
@@ -718,9 +624,7 @@ export default function Tracker() {
             }).addTo(map);
 
           } else {
-
             marker.setLatLng(point);
-
           }
 
           var el = marker.getElement();
@@ -728,13 +632,11 @@ export default function Tracker() {
           if (el) {
             var inner = el.querySelector('.gps-arrow');
             if (inner) {
-              inner.style.transform =
-                'rotate(' + (data.bearing || 0) + 'deg)';
+              inner.style.transform = 'rotate(' + (data.bearing || 0) + 'deg)';
             }
           }
 
           if (data.path) {
-
             var latlngs = data.path.map(
               p => [p.latitude, p.longitude]
             );
@@ -783,11 +685,7 @@ export default function Tracker() {
   if (isLoadingLocation) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator
-          size="large"
-          color="#007bff"
-        />
-
+        <ActivityIndicator size="large" color="#007bff"/>
         <Text style={styles.loadingText}>Chargement GPS...</Text>
       </View>
     );
@@ -800,9 +698,10 @@ export default function Tracker() {
   return (
     <View style={styles.container}>
       <Text style={styles.pageInformations}>
-        Event id: {raceEventId} - Race id:{' '}
-        {raceId} - Participant id:{' '}
-        {raceParticipantId}
+        Event id: {raceEventId} - 
+        Race id:{' '} {raceId} -
+         Participant id:{' '} {raceParticipantId} - 
+         Key:{' '} {raceParticipantKey}
       </Text>
 
       <View style={styles.mapContainer}>
