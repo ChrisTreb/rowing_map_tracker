@@ -53,7 +53,7 @@ export const initDb = async () => {
   try {
     db = await SQLite.openDatabaseAsync("rowing_tracker.db");
 
-    dropAllTables(db);
+    // dropAllTables(db);
 
     // ... existing schema definition ...
     await db.execAsync(`
