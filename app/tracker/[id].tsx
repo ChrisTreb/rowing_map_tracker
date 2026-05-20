@@ -226,7 +226,7 @@ export default function Tracker() {
     <script>
       var map = L.map('map').setView([48.39, -4.48], 15);
 
-      L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png').addTo(map);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
       var polyline = L.polyline([], { color: '#4266f5', weight: 5 }).addTo(map);
       var marker = null;
