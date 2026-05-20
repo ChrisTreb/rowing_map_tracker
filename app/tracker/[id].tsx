@@ -2,7 +2,7 @@ import { addRaceParticipantPosition } from '@/services/raceParticipantPosition';
 import { ClassPosition, Position } from '@/types/Position';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { useKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
 import * as TaskManager from 'expo-task-manager';
@@ -131,6 +131,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 });
 
 export default function Tracker() {
+
   const { id, eventId, participantId, participantKey } = useLocalSearchParams();
   const raceId = parseInt(id as string);
   const raceEventId = parseInt(eventId as string);
@@ -153,6 +154,9 @@ export default function Tracker() {
   const webviewRef = useRef<WebView>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null); // Pour le suivi en premier plan (UI)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Gérer le mode KeepAwake en fonction de l'état de tracking
+  useKeepAwake(isTracking ? 'tracking' : undefined);
 
   // Gérer les permissions de localisation au montage et nettoyer à l'unmount
   useEffect(() => {
@@ -226,10 +230,6 @@ export default function Tracker() {
 
   // ▶️ START
   const startTracking = async () => {
-
-    // Empêche l'écran de s'éteindre
-    await activateKeepAwakeAsync();
-
     // Réinitialiser l'état UI
     setDistance(0);
     setTimeElapsed(0);
@@ -376,10 +376,6 @@ export default function Tracker() {
       setCurrentSpeed(0);
       setBearing(0);
       setCurrentLocation(INIT_LOCATION);
-
-      // Stopper le mode KeepAwake
-      await deactivateKeepAwake();
-
     } catch (e) {
       console.error('Error stopping location updates:', e);
       Alert.alert("Erreur", "Impossible d'arrêter le suivi GPS.");
