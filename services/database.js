@@ -53,7 +53,7 @@ export const initDb = async () => {
   try {
     db = await SQLite.openDatabaseAsync("rowing_tracker.db");
 
-    // dropAllTables(db);
+    dropAllTables(db);
 
     // ... existing schema definition ...
     await db.execAsync(`
@@ -173,25 +173,3 @@ export const resetDatabase = async () => {
     throw error;
   }
 };
-
-// Import and re-export all specific operations
-import * as phoneKeysOperations from './phoneKeys';
-import * as raceOperations from './race';
-import * as raceEventOperations from './raceEvent';
-import * as raceEventTrackOperations from './raceEventTrack';
-import * as raceParticipantOperations from './raceParticipant';
-import * as raceParticipantPositionOperations from './raceParticipantPosition';
-import * as rowingClubOperations from './rowingClub';
-import * as sessionOperations from './session';
-import * as userOperations from './user';
-
-export const { addPhoneRpKey, getPhoneRpKeys, deletePhoneRpKey } = phoneKeysOperations;
-export const { addRace, getRaces, getRaceById } = raceOperations;
-export const { addRowingClub, getRowingClubs, getRowingClubById, updateRowingClub, deleteRowingClub } = rowingClubOperations;
-export const { addUser, getUserById, updateUser, deleteUser } = userOperations;
-export const { addSession, getSessionById, deleteSession } = sessionOperations;
-export const { addRaceEvent, getRaceEvents, getRaceEventById, updateRaceEvent } = raceEventOperations;
-export const { addRaceEventTrack, getRaceEventTracksByRaceEventId, getRaceEventTrackById, updateRaceEventTrack } = raceEventTrackOperations;
-export const { addRaceParticipant, getRaceParticipantsByRaceId, getRaceParticipantById, updateRaceParticipant, deleteRaceParticipant } = raceParticipantOperations;
-export const { addRaceParticipantPosition, getRaceParticipantPositionsByParticipantKey, deleteRaceParticipantPositionsByParticipantId } = raceParticipantPositionOperations;
-
