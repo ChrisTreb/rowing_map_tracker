@@ -2,6 +2,7 @@ import { addRaceParticipantPosition } from '@/services/raceParticipantPosition';
 import { ClassPosition, Position } from '@/types/Position';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { deactivateKeepAwake, useKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
 import * as TaskManager from 'expo-task-manager';
@@ -226,6 +227,9 @@ export default function Tracker() {
   // ▶️ START
   const startTracking = async () => {
 
+     // Empêche l'écran de s'éteindre
+    useKeepAwake();
+
     // Réinitialiser l'état UI
     setDistance(0);
     setTimeElapsed(0);
@@ -251,7 +255,7 @@ export default function Tracker() {
         accuracy: Location.Accuracy.BestForNavigation,
         distanceInterval: 0, // 5 Mètres en production
         timeInterval: LOCATION_UPDATE_INTERVAL, // Millisecondes
-        // deferredUpdatesInterval: 5000,
+        deferredUpdatesInterval: 5000,
         deferredUpdatesDistance: 0, // 5 en production
         showsBackgroundLocationIndicator: true,
         foregroundService: {
@@ -356,6 +360,9 @@ export default function Tracker() {
       setBearing(0);
       setCurrentLocation(INIT_LOCATION);
 
+      // Stopper le mode KeepAwake
+      deactivateKeepAwake();
+
     } catch (e) {
       console.error('Error stopping location updates:', e);
       Alert.alert("Erreur", "Impossible d'arrêter le suivi GPS.");
@@ -433,16 +440,13 @@ export default function Tracker() {
           </View>
         </View>
       </View>
-
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E3E5E7', paddingVertical: 40, paddingHorizontal: 10 },
-
   pageInformations: { fontSize: 12, fontWeight: 'bold', marginBottom: 10 },
-
   btn: {
     display: 'flex',
     alignItems: "center",
@@ -469,15 +473,12 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 20, color: '#f8f9ff', fontWeight: 'bold' },
   btnStart: { backgroundColor: "#216161" },
   btnStop: { backgroundColor: "#FE4B32" },
-
   infos: { marginTop: 20, paddingHorizontal: 15 },
-
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 15,
   },
-
   card: {
     flex: 1,
     backgroundColor: "#0A0F0E",
@@ -487,12 +488,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 3,
   },
-
   label: { fontSize: 16, color: "#E3E5E7" },
   value: { fontSize: 28, fontWeight: "bold", color: "#E3E5E7" },
   unit: { fontSize: 12, color: "#E3E5E7" },
 
-  // Nouveaux styles pour le chargement
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
