@@ -2,7 +2,7 @@ import { addRaceParticipantPosition } from '@/services/raceParticipantPosition';
 import { ClassPosition, Position } from '@/types/Position';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { deactivateKeepAwake, useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
 import * as TaskManager from 'expo-task-manager';
@@ -227,8 +227,8 @@ export default function Tracker() {
   // ▶️ START
   const startTracking = async () => {
 
-     // Empêche l'écran de s'éteindre
-    useKeepAwake();
+    // Empêche l'écran de s'éteindre
+    await activateKeepAwakeAsync();
 
     // Réinitialiser l'état UI
     setDistance(0);
@@ -253,10 +253,10 @@ export default function Tracker() {
 
       await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
         accuracy: Location.Accuracy.BestForNavigation,
-        distanceInterval: 0, // 5 Mètres en production
+        distanceInterval: 5, // 5 Mètres en production
         timeInterval: LOCATION_UPDATE_INTERVAL, // Millisecondes
         deferredUpdatesInterval: 5000,
-        deferredUpdatesDistance: 0, // 5 en production
+        deferredUpdatesDistance: 5, // 5 en production
         showsBackgroundLocationIndicator: true,
         foregroundService: {
           notificationTitle: 'Tracking de la course',
@@ -279,7 +279,7 @@ export default function Tracker() {
           distanceInterval: 5
         },
         (location) => {
-          const { latitude, longitude, accuracy } = location.coords;
+          const { latitude, longitude, accuracy, speed: gpsSpeed } = location.coords;
           if (accuracy != null && accuracy > MAX_ACCURACY) return;
 
           const now = location.timestamp;
@@ -289,29 +289,46 @@ export default function Tracker() {
             if (prev.length === 0) return [newPoint];
             const last = prev[prev.length - 1];
             const d = calculateDistance(last.latitude, last.longitude, latitude, longitude);
+
             if (d < MIN_DISTANCE) return prev;
 
             let speed = 0;
+
             if (lastTimestamp.current) {
               const dt = (now - lastTimestamp.current) / 1000;
               if (dt > 0) speed = (d / dt) * 3600;
             }
-            lastTimestamp.current = now;
-            if (speed > MAX_SPEED) return prev;
 
-            setCurrentSpeed(prev => prev * 0.7 + speed * 0.3);
-            if (speed > 1) {
-              const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
-              const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
-              lastBearing.current = smoothBearing;
-              setBearing(smoothBearing);
+            lastTimestamp.current = now;
+
+            const gpsSpeedKmh = gpsSpeed && gpsSpeed > 0 ? gpsSpeed * 3.6 : 0;
+            const finalSpeed = gpsSpeedKmh > 0 ? gpsSpeedKmh : speed;
+
+            // UTILISATEUR À L'ARRÊT
+            if (d < 0.003 || finalSpeed < 1) {
+              setCurrentSpeed(0);
+              return prev;
             }
+
+            if (finalSpeed > MAX_SPEED) {
+              return prev;
+            }
+
+            if (finalSpeed > MAX_SPEED) return prev;
+
+            setCurrentSpeed(prevSpeed =>
+              prevSpeed * 0.3 + finalSpeed * 0.7
+            );
+
+            const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
+            const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
+            lastBearing.current = smoothBearing;
+            setBearing(smoothBearing);
+
             setDistance(dist => dist + d);
             return [...prev, newPoint];
           });
           setCurrentLocation(newPoint);
-          // La sauvegarde de position est gérée par la tâche en arrière-plan.
-          // On ne fait que mettre à jour l'UI ici.
         }
       );
     } catch (e) {
@@ -361,7 +378,7 @@ export default function Tracker() {
       setCurrentLocation(INIT_LOCATION);
 
       // Stopper le mode KeepAwake
-      deactivateKeepAwake();
+      await deactivateKeepAwake();
 
     } catch (e) {
       console.error('Error stopping location updates:', e);
