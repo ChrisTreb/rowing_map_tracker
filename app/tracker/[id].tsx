@@ -28,8 +28,10 @@ const apiURL = process.env.EXPO_PUBLIC_API_URL;
 
 const INIT_LOCATION: Position = { latitude: 48.39, longitude: -4.48 };
 
-// 🔥 BEARING
-const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+// 🔥 BEARING (calcul amélioré)
+const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number): number | null => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+
   const toRad = (deg: number) => deg * Math.PI / 180;
   const toDeg = (rad: number) => rad * 180 / Math.PI;
 
@@ -98,7 +100,6 @@ const sendCurrentPositionToApi = async (rpp_rp_key: string, latitude: number, lo
 
 // --- Définition de la tâche de localisation en arrière-plan ---
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-
   console.log('Task called !');
 
   if (error) {
@@ -145,12 +146,11 @@ export default function Tracker() {
   const [timeElapsed, setTimeElapsed] = useState<number>(0);
   const [path, setPath] = useState<{ latitude: number; longitude: number }[]>([]);
   const [bearing, setBearing] = useState<number>(0);
-  const [currentSpeed, setCurrentSpeed] = useState<number>(0);
+  const [currentSpeed, setCurrentSpeed] = useState<number | null>(null);
 
   const startTimeRef = useRef<number | null>(null);
   const lastTimestamp = useRef<number | null>(null);
-  const lastBearing = useRef<number>(0);
-
+  const lastBearing = useRef<number | null>(null); // Reset à null pour initialiser proprement
   const webviewRef = useRef<WebView>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null); // Pour le suivi en premier plan (UI)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -169,7 +169,7 @@ export default function Tracker() {
         return;
       }
 
-      // Demande de permission de localisation en arrière-plan (Android/iOS)
+      // Demande de permission de permission de localisation en arrière-plan (Android/iOS)
       let { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
       if (backgroundStatus !== 'granted') {
         Alert.alert('Permission refusée', 'La permission d\'accéder à la localisation en arrière-plan est nécessaire pour le tracking continu.');
@@ -230,15 +230,18 @@ export default function Tracker() {
 
   // ▶️ START
   const startTracking = async () => {
-    // Réinitialiser l'état UI
+    // Réinitialiser l'état UI complètement
     setDistance(0);
     setTimeElapsed(0);
     setPath([]);
-    setCurrentSpeed(0);
+
+    // Reset de la vitesse à null pour éviter le smoothing précédent
+    setCurrentSpeed(null);
     lastTimestamp.current = null;
+    lastBearing.current = null; // Reset le dernier bearing
 
     startTimeRef.current = Date.now();
-    await AsyncStorage.setItem(ASYNC_STORAGE_START_TIME, startTimeRef.current.toString()); // Persister le temps de début
+    await AsyncStorage.setItem(ASYNC_STORAGE_START_TIME, startTimeRef.current.toString());
 
     timerRef.current = setInterval(() => {
       if (startTimeRef.current) {
@@ -280,54 +283,86 @@ export default function Tracker() {
         },
         (location) => {
           const { latitude, longitude, accuracy, speed: gpsSpeed } = location.coords;
+
+          // Ignorer si précision GPS est mauvaise
           if (accuracy != null && accuracy > MAX_ACCURACY) return;
 
           const now = location.timestamp;
           const newPoint = { latitude, longitude };
 
           setPath(prev => {
-            if (prev.length === 0) return [newPoint];
+            if (prev.length === 0) {
+              lastTimestamp.current = now; // Initialise lastTimestamp pour la première position
+              return [newPoint];
+            }
             const last = prev[prev.length - 1];
             const d = calculateDistance(last.latitude, last.longitude, latitude, longitude);
 
+            // Seuil de distance : éviter les positions bruitées
             if (d < MIN_DISTANCE) return prev;
 
             let speed = 0;
 
-            if (lastTimestamp.current) {
-              const dt = (now - lastTimestamp.current) / 1000;
-              if (dt > 0) speed = (d / dt) * 3600;
+            if (lastTimestamp.current && now >= lastTimestamp.current) {
+              const dt = (now - lastTimestamp.current) / 1000; // en secondes
+
+              // Éviter la division par zéro
+              if (dt > 0.5) { // Minimum 0.5s entre deux positions
+                speed = (d / dt) * 3.6; // km/h
+              }
             }
 
             lastTimestamp.current = now;
 
-            const gpsSpeedKmh = gpsSpeed && gpsSpeed > 0 ? gpsSpeed * 3.6 : 0;
-            const finalSpeed = gpsSpeedKmh > 0 ? gpsSpeedKmh : speed;
+            // Utiliser la vélocité GPS si disponible et valide, sinon le calcul distance/temps
+            const gpsSpeedKmh = (gpsSpeed && typeof gpsSpeed === 'number' && gpsSpeed > 0) ? gpsSpeed * 3.6 : null;
 
-            // UTILISATEUR À L'ARRÊT
-            if (d < 0.003 || finalSpeed < 1) {
+            // Préférer GPS si vitesse calculée est trop faible (bruit de GPS)
+            const finalSpeed =
+              (gpsSpeedKmh !== null && gpsSpeedKmh > speed * 1.5)
+                ? gpsSpeedKmh
+                : speed;
+
+            // ✅ ARRÊT INTELLIGENT : Reset la vitesse à 0 si l'utilisateur s'arrête
+            if (d < 0.003 || finalSpeed < 0.1) {
               setCurrentSpeed(0);
               return prev;
             }
 
-            if (finalSpeed > MAX_SPEED) {
-              return prev;
+            // Limiter MAX_SPEED uniquement pour la boucle, pas pour l'affichage
+            const smoothedFinalSpeed = Math.min(finalSpeed, MAX_SPEED);
+
+            // ✅ Smoothed speed avec reset complet à 0 quand on est à l'arrêt
+            let nextSpeed = 0;
+            if (currentSpeed === null) {
+              // Première position : utiliser la vitesse réelle
+              nextSpeed = smoothedFinalSpeed;
+            } else {
+              // Appliquer le smoothing seulement si on bouge
+              nextSpeed = currentSpeed * 0.3 + smoothedFinalSpeed * 0.7;
             }
 
-            if (finalSpeed > MAX_SPEED) return prev;
-
-            setCurrentSpeed(prevSpeed =>
-              prevSpeed * 0.3 + finalSpeed * 0.7
-            );
-
-            const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
-            const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
-            lastBearing.current = smoothBearing;
-            setBearing(smoothBearing);
+            setCurrentSpeed(nextSpeed);
+            const rawBearing = getBearing(last.latitude, last.longitude, latitude, longitude);
+            if (rawBearing !== null) {
+              let smoothBearing;
+              if (lastBearing.current === null) {
+                smoothBearing = rawBearing;
+              } else {
+                // Smoothing du bearing. Gérer le passage de 359 à 0 degrés
+                let diff = rawBearing - lastBearing.current;
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+                smoothBearing = (lastBearing.current + diff * 0.2 + 360) % 360;
+              }
+              lastBearing.current = smoothBearing;
+              setBearing(smoothBearing);
+            }
 
             setDistance(dist => dist + d);
             return [...prev, newPoint];
           });
+
           setCurrentLocation(newPoint);
         }
       );
@@ -338,6 +373,7 @@ export default function Tracker() {
       // Nettoyer en cas d'échec
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       startTimeRef.current = null;
+      lastBearing.current = null; // Reset bearing en cas d'échec
       await AsyncStorage.multiRemove([ASYNC_STORAGE_RP_ID, ASYNC_STORAGE_RP_KEY, ASYNC_STORAGE_START_TIME]);
     }
   };
@@ -362,6 +398,7 @@ export default function Tracker() {
         timerRef.current = null;
       }
       startTimeRef.current = null; // Réinitialiser le temps de début
+      lastBearing.current = null; // Réinitialiser le bearing
 
       // Nettoyer les données persistantes du tracking
       await AsyncStorage.multiRemove([ASYNC_STORAGE_RP_ID, ASYNC_STORAGE_RP_KEY, ASYNC_STORAGE_START_TIME]);
@@ -373,7 +410,7 @@ export default function Tracker() {
       setDistance(0);
       setTimeElapsed(0);
       setPath([]);
-      setCurrentSpeed(0);
+      setCurrentSpeed(null); // Utilisez null pour indiquer l'état initial
       setBearing(0);
       setCurrentLocation(INIT_LOCATION);
     } catch (e) {
@@ -439,7 +476,7 @@ export default function Tracker() {
           <View style={styles.card}>
             <Text style={styles.label}>Vitesse actuelle</Text>
             <Text style={[styles.value, { color: "#FFCE39" }]}>
-              {currentSpeed.toFixed(2)}
+              {currentSpeed !== null ? currentSpeed.toFixed(2) : "0.00"}
             </Text>
             <Text style={styles.unit}>km/h</Text>
           </View>
