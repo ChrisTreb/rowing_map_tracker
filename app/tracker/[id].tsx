@@ -9,7 +9,7 @@ import * as TaskManager from 'expo-task-manager';
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, AppState, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
-import LeafletMap from '../components/LeafletMap';
+import NavigationModal from './NavigationModal';
 
 // CONFIG
 const MIN_DISTANCE: number = 0.005;  // 5 mètres
@@ -111,20 +111,22 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
     console.log('Locations array in task manager:', locations);
 
-    const latestLocation = locations[0];
-
-    console.log('Task manager latest location get first:', latestLocation);
-
     const storedParticipantId = await AsyncStorage.getItem(ASYNC_STORAGE_RP_ID);
     const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
 
     if (storedParticipantId && storedParticipantKey) {
-      await globalSaveParticipantPosition(
-        parseInt(storedParticipantId),
-        storedParticipantKey,
-        latestLocation.coords.latitude,
-        latestLocation.coords.longitude
-      );
+      
+      for (const location of locations) {
+
+        console.log('POSITION:', new Date(location.timestamp).toISOString());
+
+        await globalSaveParticipantPosition(
+          parseInt(storedParticipantId),
+          storedParticipantKey,
+          location.coords.latitude,
+          location.coords.longitude
+        );
+      }
     } else {
       console.warn('Participant ID or Key not found in AsyncStorage for background task. Cannot save position.');
     }
@@ -147,6 +149,9 @@ export default function Tracker() {
   const [path, setPath] = useState<{ latitude: number; longitude: number }[]>([]);
   const [bearing, setBearing] = useState<number>(0);
   const [currentSpeed, setCurrentSpeed] = useState<number | null>(null);
+
+  // Modal state
+  const [modalVisible, setModalVisible] = useState(false);
 
   const startTimeRef = useRef<number | null>(null);
   const lastTimestamp = useRef<number | null>(null);
@@ -210,9 +215,9 @@ export default function Tracker() {
         locationSubscription.current = null;
       }
     };
-  }, []); // Le tableau de dépendances vide assure qu'il s'exécute une seule fois au montage
+  }, []);
 
-  /// 📡 SEND MAP (remis à l'intérieur du composant)
+  /// 📡 SEND MAP
   useEffect(() => {
     // Ne met à jour la WebView que si l'application est en premier plan
     // et que le ref de la webview est disponible.
@@ -256,10 +261,8 @@ export default function Tracker() {
 
       await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
         accuracy: Location.Accuracy.BestForNavigation,
-        distanceInterval: 5, // 5 Mètres en production
-        timeInterval: LOCATION_UPDATE_INTERVAL, // Millisecondes
-        deferredUpdatesInterval: 5000,
-        deferredUpdatesDistance: 5, // 5 en production
+        distanceInterval: 1,
+        timeInterval: LOCATION_UPDATE_INTERVAL,
         showsBackgroundLocationIndicator: true,
         foregroundService: {
           notificationTitle: 'Tracking de la course',
@@ -267,12 +270,11 @@ export default function Tracker() {
           notificationColor: '#216161',
           killServiceOnDestroy: true,
         },
-        activityType: Location.ActivityType.OtherNavigation,
+        activityType: Location.ActivityType.Fitness,
         pausesUpdatesAutomatically: false,
       });
 
       setIsTracking(true);
-      Alert.alert("Tracking démarré", "Le suivi GPS est maintenant actif en arrière-plan. Une notification est visible.");
 
       // Démarrer le watchPositionAsync pour mettre à jour l'UI en premier plan
       locationSubscription.current = await Location.watchPositionAsync(
@@ -318,10 +320,7 @@ export default function Tracker() {
             const gpsSpeedKmh = (gpsSpeed && typeof gpsSpeed === 'number' && gpsSpeed > 0) ? gpsSpeed * 3.6 : null;
 
             // Préférer GPS si vitesse calculée est trop faible (bruit de GPS)
-            const finalSpeed =
-              (gpsSpeedKmh !== null && gpsSpeedKmh > speed * 1.5)
-                ? gpsSpeedKmh
-                : speed;
+            const finalSpeed = (gpsSpeedKmh !== null && gpsSpeedKmh > speed * 1.5) ? gpsSpeedKmh : speed;
 
             // ✅ ARRÊT INTELLIGENT : Reset la vitesse à 0 si l'utilisateur s'arrête
             if (d < 0.003 || finalSpeed < 0.1) {
@@ -378,6 +377,11 @@ export default function Tracker() {
     }
   };
 
+  const handleStart = () => {
+    setModalVisible(true);
+    startTracking();
+  };
+
   // ⏹ STOP
   const stopTracking = async () => {
     const hasStarted = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
@@ -413,6 +417,9 @@ export default function Tracker() {
       setCurrentSpeed(null); // Utilisez null pour indiquer l'état initial
       setBearing(0);
       setCurrentLocation(INIT_LOCATION);
+
+      // Fermer le modal si ouvert
+      setModalVisible(false);
     } catch (e) {
       console.error('Error stopping location updates:', e);
       Alert.alert("Erreur", "Impossible d'arrêter le suivi GPS.");
@@ -445,10 +452,8 @@ export default function Tracker() {
     <View style={styles.container}>
       <Text style={styles.pageInformations}>Event id: {raceEventId} - Race id: {raceId} - Participant id: {raceParticipantId} - Participant key: {raceParticipantKey}</Text>
 
-      <LeafletMap webviewRef={webviewRef} />
-
       {!isTracking ? (
-        <TouchableOpacity onPress={startTracking} style={[styles.btn, styles.btnStart]}>
+        <TouchableOpacity onPress={handleStart} style={[styles.btn, styles.btnStart]}>
           <Text style={styles.btnText}><Ionicons name="play" size={26} color="white" /> Démarrer le tracking</Text>
         </TouchableOpacity>
       ) : (
@@ -457,39 +462,23 @@ export default function Tracker() {
         </TouchableOpacity>
       )}
 
-      <View style={styles.infos}>
-        <View style={styles.row}>
-          <View style={styles.card}>
-            <Text style={styles.label}>Distance</Text>
-            <Text style={styles.value}>{distance.toFixed(2)}</Text>
-            <Text style={styles.unit}>km</Text>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.label}>Temps</Text>
-            <Text style={styles.value}>{formatTime(timeElapsed)}</Text>
-            <Text style={styles.unit}></Text>
-          </View>
-        </View>
-
-        <View style={styles.row}>
-          <View style={styles.card}>
-            <Text style={styles.label}>Vitesse actuelle</Text>
-            <Text style={[styles.value, { color: "#FFCE39" }]}>
-              {currentSpeed !== null ? currentSpeed.toFixed(2) : "0.00"}
-            </Text>
-            <Text style={styles.unit}>km/h</Text>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.label}>Vitesse moyenne</Text>
-            <Text style={styles.value}>
-              {(timeElapsed > 0 ? distance / (timeElapsed / 3600) : 0).toFixed(2)}
-            </Text>
-            <Text style={styles.unit}>km/h</Text>
-          </View>
-        </View>
-      </View>
+      {/* Navigation Modal */}
+      <NavigationModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSwipeUnlocked={() => setModalVisible(false)}
+        data={{
+          currentLocation,
+          distance,
+          timeElapsed,
+          path,
+          bearing,
+          currentSpeed,
+          raceEventId,
+          raceParticipantKey,
+          webviewRef
+        }}
+      />
     </View>
   );
 };
@@ -508,18 +497,6 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     elevation: 3,
   },
-  btnBattery: {
-    display: 'flex',
-    alignItems: "center",
-    justifyContent: "center",
-    width: '100%',
-    height: 60,
-    alignSelf: "center",
-    marginTop: 20,
-    borderRadius: 40,
-    elevation: 3,
-    backgroundColor: "#5a12d6",
-  },
   btnText: { fontSize: 20, color: '#f8f9ff', fontWeight: 'bold' },
   btnStart: { backgroundColor: "#216161" },
   btnStop: { backgroundColor: "#FE4B32" },
@@ -529,19 +506,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 15,
   },
-  card: {
-    flex: 1,
-    backgroundColor: "#0A0F0E",
-    borderRadius: 16,
-    padding: 15,
-    marginHorizontal: 3,
-    alignItems: "center",
-    elevation: 3,
-  },
-  label: { fontSize: 16, color: "#E3E5E7" },
-  value: { fontSize: 28, fontWeight: "bold", color: "#E3E5E7" },
-  unit: { fontSize: 12, color: "#E3E5E7" },
-
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
