@@ -1,19 +1,20 @@
 import { addRaceParticipantPosition } from '@/services/raceParticipantPosition';
 import { ClassPosition, Position } from '@/types/Position';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useKeepAwake } from 'expo-keep-awake';
 import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
 import * as TaskManager from 'expo-task-manager';
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, AppState, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
+import LeafletMap from '../components/LeafletMap';
 
 // CONFIG
-const MIN_DISTANCE: number = 0.005;
-const MIN_SPEED_DISTANCE: number = 0.01;
+const MIN_DISTANCE: number = 0.005;  // 5 mètres
 const MAX_SPEED: number = 200; // Change to 50 in production
-const MAX_ACCURACY: number = 5;
+const MAX_ACCURACY: number = 30;
 const LOCATION_UPDATE_INTERVAL: number = 2000; // Fréquence de mise à jour bdd ou api en ms
 const LOCATION_TASK_NAME = 'background-location-task'; // Nom unique pour la tâche
 
@@ -22,10 +23,8 @@ const ASYNC_STORAGE_RP_ID = 'rp_id';
 const ASYNC_STORAGE_RP_KEY = 'rp_key';
 const ASYNC_STORAGE_START_TIME = 'tracking_start_time';
 
-
 // API configuration
 const apiURL = process.env.EXPO_PUBLIC_API_URL;
-const apiKey = process.env.EXPO_PUBLIC_API_KEY;
 
 const INIT_LOCATION: Position = { latitude: 48.39, longitude: -4.48 };
 
@@ -39,9 +38,7 @@ const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const Δλ = toRad(lon2 - lon1);
 
   const y = Math.sin(Δλ) * Math.cos(φ2);
-  const x =
-    Math.cos(φ1) * Math.sin(φ2) -
-    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
 
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 };
@@ -54,10 +51,7 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   const Δφ = (lat2 - lat1) * Math.PI / 180;
   const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-  const a = Math.sin(Δφ / 2) ** 2 +
-    Math.cos(φ1) * Math.cos(φ2) *
-    Math.sin(Δλ / 2) ** 2;
-
+  const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))) / 1000;
 };
 
@@ -82,6 +76,11 @@ const globalSaveParticipantPosition = async (
     return;
   }
 
+  // Envoyer la position au serveur via l'API
+  sendCurrentPositionToApi(rpp_rp_key, latitude, longitude);
+};
+
+const sendCurrentPositionToApi = async (rpp_rp_key: string, latitude: number, longitude: number) => {
   try {
     const participantPosition = new ClassPosition(latitude, longitude);
 
@@ -95,17 +94,25 @@ const globalSaveParticipantPosition = async (
   } catch (error) {
     console.error("Failed posting new position to API from background task:", error);
   }
-};
+}
 
 // --- Définition de la tâche de localisation en arrière-plan ---
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+
+  console.log('Task called !');
+
   if (error) {
     console.error('LOCATION_TASK_ERROR', error);
     return;
   }
   if (data) {
     const { locations } = data as { locations: Location.LocationObject[] };
+
+    console.log('Locations array in task manager:', locations);
+
     const latestLocation = locations[0];
+
+    console.log('Task manager latest location get first:', latestLocation);
 
     const storedParticipantId = await AsyncStorage.getItem(ASYNC_STORAGE_RP_ID);
     const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
@@ -122,7 +129,6 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     }
   }
 });
-
 
 export default function Tracker() {
 
@@ -149,6 +155,9 @@ export default function Tracker() {
   const locationSubscription = useRef<Location.LocationSubscription | null>(null); // Pour le suivi en premier plan (UI)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Gérer le mode KeepAwake en fonction de l'état de tracking
+  useKeepAwake(isTracking ? 'tracking' : undefined);
+
   // Gérer les permissions de localisation au montage et nettoyer à l'unmount
   useEffect(() => {
     const initializeTrackingAndPermissions = async () => {
@@ -170,7 +179,7 @@ export default function Tracker() {
       // Tenter de récupérer la position actuelle du téléphone
       try {
         const initialLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
+          accuracy: Location.Accuracy.BestForNavigation,
         });
         setCurrentLocation({
           latitude: initialLocation.coords.latitude,
@@ -186,68 +195,6 @@ export default function Tracker() {
         Alert.alert("Erreur", "Impossible de récupérer votre position actuelle.");
       } finally {
         setIsLoadingLocation(false); // Fin du chargement de la position initiale
-      }
-
-
-      // Vérifier si la tâche est déjà enregistrée et si le tracking est actif
-      const isTaskActive = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-      setIsTracking(isTaskActive);
-
-      // Si le tracking était déjà actif, on peut tenter de récupérer le temps de début
-      if (isTaskActive) {
-          const storedStartTime = await AsyncStorage.getItem(ASYNC_STORAGE_START_TIME);
-          if (storedStartTime) {
-              startTimeRef.current = parseInt(storedStartTime);
-              // Lancer le timer pour le temps écoulé si le tracking est actif
-              timerRef.current = setInterval(() => {
-                if (startTimeRef.current) {
-                  setTimeElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
-                }
-              }, 1000) as unknown as NodeJS.Timeout;
-          }
-          console.log("Background location task was active. UI state might not reflect actual path/distance without persistence load.");
-
-          // Lancer un watchPositionAsync juste pour mettre à jour l'UI en premier plan
-          locationSubscription.current = await Location.watchPositionAsync(
-            {
-              accuracy: Location.Accuracy.High,
-              timeInterval: 1000,
-              distanceInterval: 1
-            },
-            (location) => {
-              const { latitude, longitude, accuracy } = location.coords;
-              if (accuracy != null && accuracy > MAX_ACCURACY) return;
-
-              const now = location.timestamp;
-              const newPoint = { latitude, longitude };
-
-              setPath(prev => {
-                if (prev.length === 0) return [newPoint];
-                const last = prev[prev.length - 1];
-                const d = calculateDistance(last.latitude, last.longitude, latitude, longitude);
-                if (d < MIN_DISTANCE) return prev;
-
-                let speed = 0;
-                if (lastTimestamp.current) {
-                  const dt = (now - lastTimestamp.current) / 1000;
-                  if (dt > 0) speed = (d / dt) * 3600;
-                }
-                lastTimestamp.current = now;
-                if (speed > MAX_SPEED) return prev;
-
-                setCurrentSpeed(prev => prev * 0.7 + speed * 0.3);
-                if (speed > 1) {
-                  const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
-                  const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
-                  lastBearing.current = smoothBearing;
-                  setBearing(smoothBearing);
-                }
-                setDistance(dist => dist + d);
-                return [...prev, newPoint];
-              });
-              setCurrentLocation(newPoint);
-            }
-          );
       }
     };
 
@@ -265,106 +212,24 @@ export default function Tracker() {
     };
   }, []); // Le tableau de dépendances vide assure qu'il s'exécute une seule fois au montage
 
-  // 🌍 MAP
-  const leafletHtml = `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <style>
-      body { margin: 0; }
-      #map { height: 100vh; }
-
-      .marker-inner {
-        width: 0;
-        height: 0;
-        border-left: 10px solid transparent;
-        border-right: 10px solid transparent;
-        border-bottom: 20px solid #4266f5;
-        transform-origin: 50% 70%;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="map"></div>
-
-    <script>
-      var map = L.map('map').setView([48.39, -4.48], 15);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png').addTo(map);
-
-      var polyline = L.polyline([], { color: '#4266f5', weight: 5 }).addTo(map);
-      var marker = null;
-
-      function handleMessage(event) {
-        var data = JSON.parse(event.data);
-        var point = [data.lat, data.lng];
-
-        // marker
-        if (!marker) {
-          marker = L.marker(point, {
-            icon: L.divIcon({
-              html: '<div class="marker-inner"></div>'
-            })
-          }).addTo(map);
-        } else {
-          marker.setLatLng(point);
-        }
-
-        // rotation
-        var el = marker.getElement();
-        if (el) {
-          var inner = el.querySelector('.marker-inner');
-          if (inner) {
-            inner.style.transform = 'rotate(' + (data.bearing || 0) + 'deg)';
-          }
-        }
-
-        // path
-        if (data.path) {
-          var latlngs = data.path.map(p => [p.latitude, p.longitude]);
-          polyline.setLatLngs(latlngs);
-        }
-
-        if (data.follow) {
-          map.setView(point, 17);
-        }
-      }
-
-      document.addEventListener("message", handleMessage);
-      window.addEventListener("message", handleMessage);
-    </script>
-  </body>
-  </html>
-  `;
-
   /// 📡 SEND MAP (remis à l'intérieur du composant)
   useEffect(() => {
     // Ne met à jour la WebView que si l'application est en premier plan
     // et que le ref de la webview est disponible.
     if (AppState.currentState === 'active' && webviewRef.current) {
-        webviewRef.current?.postMessage(JSON.stringify({
-            lat: currentLocation.latitude,
-            lng: currentLocation.longitude,
-            path,
-            bearing,
-            follow: true
-        }));
+      webviewRef.current?.postMessage(JSON.stringify({
+        lat: currentLocation.latitude,
+        lng: currentLocation.longitude,
+        path,
+        bearing,
+        follow: true
+      }));
     }
   }, [currentLocation, path, bearing]);
 
 
   // ▶️ START
   const startTracking = async () => {
-    const hasStarted = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-    if (hasStarted) {
-      Alert.alert("Tracking", "Le tracking est déjà démarré.");
-      setIsTracking(true);
-      return;
-    }
-
     // Réinitialiser l'état UI
     setDistance(0);
     setTimeElapsed(0);
@@ -388,12 +253,16 @@ export default function Tracker() {
 
       await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
         accuracy: Location.Accuracy.BestForNavigation,
-        distanceInterval: 1, // Mètres
+        distanceInterval: 5, // 5 Mètres en production
         timeInterval: LOCATION_UPDATE_INTERVAL, // Millisecondes
+        deferredUpdatesInterval: 5000,
+        deferredUpdatesDistance: 5, // 5 en production
+        showsBackgroundLocationIndicator: true,
         foregroundService: {
           notificationTitle: 'Tracking de la course',
           notificationBody: `Votre position est partagée pour l'événement ${raceEventId} et participant ${raceParticipantKey}.`,
           notificationColor: '#216161',
+          killServiceOnDestroy: true,
         },
         activityType: Location.ActivityType.OtherNavigation,
         pausesUpdatesAutomatically: false,
@@ -405,12 +274,12 @@ export default function Tracker() {
       // Démarrer le watchPositionAsync pour mettre à jour l'UI en premier plan
       locationSubscription.current = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 1000,
-          distanceInterval: 1
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: LOCATION_UPDATE_INTERVAL,
+          distanceInterval: 5
         },
         (location) => {
-          const { latitude, longitude, accuracy } = location.coords;
+          const { latitude, longitude, accuracy, speed: gpsSpeed } = location.coords;
           if (accuracy != null && accuracy > MAX_ACCURACY) return;
 
           const now = location.timestamp;
@@ -420,32 +289,48 @@ export default function Tracker() {
             if (prev.length === 0) return [newPoint];
             const last = prev[prev.length - 1];
             const d = calculateDistance(last.latitude, last.longitude, latitude, longitude);
+
             if (d < MIN_DISTANCE) return prev;
 
             let speed = 0;
+
             if (lastTimestamp.current) {
               const dt = (now - lastTimestamp.current) / 1000;
               if (dt > 0) speed = (d / dt) * 3600;
             }
-            lastTimestamp.current = now;
-            if (speed > MAX_SPEED) return prev;
 
-            setCurrentSpeed(prev => prev * 0.7 + speed * 0.3);
-            if (speed > 1) {
-              const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
-              const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
-              lastBearing.current = smoothBearing;
-              setBearing(smoothBearing);
+            lastTimestamp.current = now;
+
+            const gpsSpeedKmh = gpsSpeed && gpsSpeed > 0 ? gpsSpeed * 3.6 : 0;
+            const finalSpeed = gpsSpeedKmh > 0 ? gpsSpeedKmh : speed;
+
+            // UTILISATEUR À L'ARRÊT
+            if (d < 0.003 || finalSpeed < 1) {
+              setCurrentSpeed(0);
+              return prev;
             }
+
+            if (finalSpeed > MAX_SPEED) {
+              return prev;
+            }
+
+            if (finalSpeed > MAX_SPEED) return prev;
+
+            setCurrentSpeed(prevSpeed =>
+              prevSpeed * 0.3 + finalSpeed * 0.7
+            );
+
+            const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
+            const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
+            lastBearing.current = smoothBearing;
+            setBearing(smoothBearing);
+
             setDistance(dist => dist + d);
             return [...prev, newPoint];
           });
           setCurrentLocation(newPoint);
-          // La sauvegarde de position est gérée par la tâche en arrière-plan.
-          // On ne fait que mettre à jour l'UI ici.
         }
       );
-
     } catch (e) {
       console.error('Error starting location updates:', e);
       Alert.alert("Erreur", "Impossible de démarrer le suivi GPS. Vérifiez les permissions.");
@@ -469,8 +354,8 @@ export default function Tracker() {
     try {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
       if (locationSubscription.current) {
-          locationSubscription.current.remove();
-          locationSubscription.current = null;
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
       }
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -491,7 +376,6 @@ export default function Tracker() {
       setCurrentSpeed(0);
       setBearing(0);
       setCurrentLocation(INIT_LOCATION);
-
     } catch (e) {
       console.error('Error stopping location updates:', e);
       Alert.alert("Erreur", "Impossible d'arrêter le suivi GPS.");
@@ -524,14 +408,7 @@ export default function Tracker() {
     <View style={styles.container}>
       <Text style={styles.pageInformations}>Event id: {raceEventId} - Race id: {raceId} - Participant id: {raceParticipantId} - Participant key: {raceParticipantKey}</Text>
 
-      <View style={styles.mapContainer}>
-        <WebView
-          ref={webviewRef}
-          originWhitelist={['*']}
-          source={{ html: leafletHtml }}
-          style={styles.map}
-        />
-      </View>
+      <LeafletMap webviewRef={webviewRef} />
 
       {!isTracking ? (
         <TouchableOpacity onPress={startTracking} style={[styles.btn, styles.btnStart]}>
@@ -576,43 +453,45 @@ export default function Tracker() {
           </View>
         </View>
       </View>
-
     </View>
   );
 };
 
-// ... Styles restent inchangés ...
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E3E5E7', paddingVertical: 40, paddingHorizontal: 10 },
-
   pageInformations: { fontSize: 12, fontWeight: 'bold', marginBottom: 10 },
-  mapContainer: { height: 350 },
-  map: { flex: 1 },
-
   btn: {
     display: 'flex',
     alignItems: "center",
     justifyContent: "center",
     width: '100%',
-    height: 80,
+    height: 60,
     alignSelf: "center",
     marginTop: 20,
     borderRadius: 40,
-    color: '#f8f9ff',
     elevation: 3,
+  },
+  btnBattery: {
+    display: 'flex',
+    alignItems: "center",
+    justifyContent: "center",
+    width: '100%',
+    height: 60,
+    alignSelf: "center",
+    marginTop: 20,
+    borderRadius: 40,
+    elevation: 3,
+    backgroundColor: "#5a12d6",
   },
   btnText: { fontSize: 20, color: '#f8f9ff', fontWeight: 'bold' },
   btnStart: { backgroundColor: "#216161" },
   btnStop: { backgroundColor: "#FE4B32" },
-
   infos: { marginTop: 20, paddingHorizontal: 15 },
-
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 15,
   },
-
   card: {
     flex: 1,
     backgroundColor: "#0A0F0E",
@@ -622,12 +501,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 3,
   },
-
   label: { fontSize: 16, color: "#E3E5E7" },
   value: { fontSize: 28, fontWeight: "bold", color: "#E3E5E7" },
   unit: { fontSize: 12, color: "#E3E5E7" },
 
-  // Nouveaux styles pour le chargement
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

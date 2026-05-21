@@ -16,17 +16,17 @@ import { getDb } from './database';
  * @returns {Promise<void>} A promise that resolves when the key is added.
  */
 export const addPhoneRpKey = async (rp_key, re_id, re_event_end_date_and_time) => {
-  try {
-    const db = getDb();
-    await db.runAsync(
-      `INSERT INTO phone_rp_keys (prk_rp_key, re_id, re_event_end_date_and_time) VALUES (?, ?, ?)`,
-      [rp_key, re_id, re_event_end_date_and_time]
-    );
-    console.log("Phone RP key added:", rp_key);
-  } catch (error) {
-    console.error("Error adding phone RP key:", error);
-    throw error;
-  }
+    try {
+        const db = getDb();
+        await db.runAsync(
+            `INSERT INTO phone_rp_keys (prk_rp_key, re_id, re_event_end_date_and_time) VALUES (?, ?, ?)`,
+            [rp_key, re_id, re_event_end_date_and_time]
+        );
+        console.log("Phone RP key added:", rp_key);
+    } catch (error) {
+        console.error("Error adding phone RP key:", error);
+        throw error;
+    }
 };
 
 /**
@@ -62,15 +62,26 @@ export const deletePhoneRpKey = async (rp_key) => {
 
 /**
  * Deletes all phone RP keys from the database where end date and time is past.
+ * @returns {Promise<void>} A promise that resolves when the expired keys are deleted.
  */
 export const deleteExpiredPhoneRpKeys = async () => {
     try {
         const db = getDb();
-        const now = new Date().getTime();
+        const now = Date.now();
+        // Vérifie si la table existe
+        const tableExists = await db.getFirstAsync(
+            `SELECT name FROM sqlite_master WHERE type='table' AND name='phone_rp_keys'`
+        );
+        // Stop si table absente
+        if (!tableExists) {
+            console.log('Table phone_rp_keys does not exist.');
+            return;
+        }
+        // Delete expired rows
         await db.runAsync(`DELETE FROM phone_rp_keys WHERE re_event_end_date_and_time < ?`, [now]);
-        console.log("Expired phone RP keys deleted.");
+        console.log('Expired phone RP keys deleted.');
     } catch (error) {
-        console.error("Error deleting expired phone RP keys:", error);
+        console.error('Error deleting expired phone RP keys:', error);
         throw error;
     }
 };
@@ -105,7 +116,7 @@ export const getPhoneRpKeysByRaceEventId = async (re_id) => {
     try {
         const db = getDb();
         const result = await db.getAllAsync(
-            `SELECT * FROM phone_rp_keys WHERE re_id = ?`,[re_id]);
+            `SELECT * FROM phone_rp_keys WHERE re_id = ?`, [re_id]);
         return result;
     } catch (error) {
         console.error("Error retrieving phone RP keys by race event ID:", error);

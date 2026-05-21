@@ -8,9 +8,11 @@ import { formatDateTime } from "../../utils/dateUtils";
 
 interface EventCardProps {
   event: DbRaceEvent;
+  // Ajout d'une prop pour déclencher le rafraîchissement
+  onRefreshTrigger?: number;
 }
 
-const EventCard = ({ event }: EventCardProps) => {
+const EventCard = ({ event, onRefreshTrigger }: EventCardProps) => {
   const [associatedKeys, setAssociatedKeys] = useState<DbPhoneRpKey[] | null>([]);
   const [keysLoading, setKeysLoading] = useState(true);
 
@@ -28,12 +30,15 @@ const EventCard = ({ event }: EventCardProps) => {
       }
     };
     fetchKeys();
-  }, [event.re_id]); // Re-déclencher si l'ID de l'événement change
+  }, [event.re_id, onRefreshTrigger]); // Re-déclencher si l'ID de l'événement change ou une clé est ajoutée
 
   const participantKeyView = associatedKeys?.map(key => key.prk_rp_key).join(", ") ?? ""; 
 
+  // Vérifier si l'événement est passé
+  const isEventOver = event.re_event_end_date_and_time < new Date().getTime();
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isEventOver && styles.pastEventCard]}>
       <View>
         <Text style={styles.title}>{event.re_event_name}</Text>
         <Text style={styles.text}>Participants: {event.nb_participants}</Text>
@@ -46,15 +51,18 @@ const EventCard = ({ event }: EventCardProps) => {
         {/* Afficher toutes les clés associées de la DB locale */}
         {!keysLoading && associatedKeys && associatedKeys.length > 0 && (
           <Text style={styles.textKey}>
-            <Ionicons name="key" size={18} color="#0A0F0E" /> {participantKeyView}
+            {/* Envelopper Ionicons dans un <Text> séparé pour éviter l'erreur */}
+            <Text><Ionicons name="key" size={18} color="#0A0F0E" /></Text> {participantKeyView}
           </Text>
         )}
         {keysLoading && <ActivityIndicator size="small" color="#007bff" />}
       </View>
       <View style={styles.linkContainer}>
-        {/* Construisez le href pour inclure l'ID de l'événement */}
+        {/* Envelopper Ionicons dans un <Text> à l'intérieur du Link */}
         <Link href={{ pathname: "/event/[id]", params: { id: event.re_id } }} >
-          <Ionicons name="play-circle-outline" size={45} color="#E3E5E7" />
+          <Text>
+            <Ionicons name="play-circle-outline" size={45} color="#E3E5E7" />
+          </Text>
         </Link>
       </View>
     </View>
@@ -68,11 +76,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "#f0f0f0", // Couleur par défaut pour les événements actifs
     padding: 15,
     borderRadius: 12,
     marginBottom: 10,
     elevation: 2,
+    // Vous pouvez ajouter une bordure pour mieux distinguer
+    borderLeftWidth: 5,
+    borderLeftColor: '#216161', // Couleur pour les événements actifs
+  },
+  pastEventCard: {
+    backgroundColor: "#e0e0e0", // Une couleur plus discrète pour les événements passés
+    borderLeftColor: '#999', // Bordure plus grise
   },
   title: {
     fontSize: 16,
@@ -86,7 +101,9 @@ const styles = StyleSheet.create({
   },
   textKey: {
     textAlign: 'center',
-    width: 80,
+    minWidth: 80,
+    maxWidth: 260,
+    width: 'auto',
     fontSize: 16,
     fontWeight: 'bold',
     padding: 5,
