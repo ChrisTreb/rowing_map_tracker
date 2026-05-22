@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
-    backgroundColor: "#7594A8",
+    backgroundColor: "#0A0F0E",
     color: "#f5f7ff",
     borderRadius: 8,
   },
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 13,
-    color: "#555",
+    color: "#0A0F0E",
   },
   button: {
     backgroundColor: "#216161",
@@ -389,14 +389,14 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#555',
+    color: '#0A0F0E',
   },
   // Styles pour la Modale
   centeredView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Fond semi-transparent
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalView: {
     margin: 20,
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    minWidth: 300, // Assure une largeur minimale pour la modale
+    minWidth: 300,
   },
   modalTitle: {
     width: 300,
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 16,
   },
-  closeButtonSuccess: { // Style pour le bouton "Fermer" quand le message de succès est affiché
+  closeButtonSuccess: {
     backgroundColor: '#216161',
     paddingVertical: 10,
     paddingHorizontal: 20,

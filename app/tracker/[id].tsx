@@ -7,9 +7,9 @@ import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
 import * as TaskManager from 'expo-task-manager';
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, AppState, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
-import LeafletMap from '../components/LeafletMap';
+import NavigationModal from './NavigationModal';
 
 // CONFIG
 const MIN_DISTANCE: number = 0.005;  // 5 mètres
@@ -25,11 +25,14 @@ const ASYNC_STORAGE_START_TIME = 'tracking_start_time';
 
 // API configuration
 const apiURL = process.env.EXPO_PUBLIC_API_URL;
+const apiMapsViewerURL = process.env.EXPO_PUBLIC_API_MAPS_URL;
 
 const INIT_LOCATION: Position = { latitude: 48.39, longitude: -4.48 };
 
-// 🔥 BEARING
-const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+// 🔥 BEARING (calcul amélioré)
+const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number): number | null => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+
   const toRad = (deg: number) => deg * Math.PI / 180;
   const toDeg = (rad: number) => rad * 180 / Math.PI;
 
@@ -98,7 +101,6 @@ const sendCurrentPositionToApi = async (rpp_rp_key: string, latitude: number, lo
 
 // --- Définition de la tâche de localisation en arrière-plan ---
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-
   console.log('Task called !');
 
   if (error) {
@@ -110,20 +112,24 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
     console.log('Locations array in task manager:', locations);
 
-    const latestLocation = locations[0];
-
     console.log('Task manager latest location get first:', latestLocation);
 
     const storedParticipantId = await AsyncStorage.getItem(ASYNC_STORAGE_RP_ID);
     const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
 
     if (storedParticipantId && storedParticipantKey) {
-      await globalSaveParticipantPosition(
-        parseInt(storedParticipantId),
-        storedParticipantKey,
-        latestLocation.coords.latitude,
-        latestLocation.coords.longitude
-      );
+
+      for (const location of locations) {
+
+        console.log('POSITION:', new Date(location.timestamp).toISOString());
+
+        await globalSaveParticipantPosition(
+          parseInt(storedParticipantId),
+          storedParticipantKey,
+          location.coords.latitude,
+          location.coords.longitude
+        );
+      }
     } else {
       console.warn('Participant ID or Key not found in AsyncStorage for background task. Cannot save position.');
     }
@@ -132,11 +138,15 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
 export default function Tracker() {
 
-  const { id, eventId, participantId, participantKey } = useLocalSearchParams();
+  const { id, eventId, eventName, participantId, participantName, participantKey, raceName, viewerId } = useLocalSearchParams();
   const raceId = parseInt(id as string);
   const raceEventId = parseInt(eventId as string);
+  const raceEventName = eventName;
   const raceParticipantId = parseInt(participantId as string);
+  const raceParticipantName = participantName;
   const raceParticipantKey = participantKey;
+  const raceCurrentName = raceName;
+  const apiViewerId = viewerId;
 
   const [currentLocation, setCurrentLocation] = useState<Position>(INIT_LOCATION);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
@@ -145,12 +155,14 @@ export default function Tracker() {
   const [timeElapsed, setTimeElapsed] = useState<number>(0);
   const [path, setPath] = useState<{ latitude: number; longitude: number }[]>([]);
   const [bearing, setBearing] = useState<number>(0);
-  const [currentSpeed, setCurrentSpeed] = useState<number>(0);
+  const [currentSpeed, setCurrentSpeed] = useState<number | null>(null);
+
+  // Modal state
+  const [modalVisible, setModalVisible] = useState(false);
 
   const startTimeRef = useRef<number | null>(null);
   const lastTimestamp = useRef<number | null>(null);
-  const lastBearing = useRef<number>(0);
-
+  const lastBearing = useRef<number | null>(null); // Reset à null pour initialiser proprement
   const webviewRef = useRef<WebView>(null);
   const locationSubscription = useRef<Location.LocationSubscription | null>(null); // Pour le suivi en premier plan (UI)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -169,7 +181,7 @@ export default function Tracker() {
         return;
       }
 
-      // Demande de permission de localisation en arrière-plan (Android/iOS)
+      // Demande de permission de permission de localisation en arrière-plan (Android/iOS)
       let { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
       if (backgroundStatus !== 'granted') {
         Alert.alert('Permission refusée', 'La permission d\'accéder à la localisation en arrière-plan est nécessaire pour le tracking continu.');
@@ -210,9 +222,9 @@ export default function Tracker() {
         locationSubscription.current = null;
       }
     };
-  }, []); // Le tableau de dépendances vide assure qu'il s'exécute une seule fois au montage
+  }, []);
 
-  /// 📡 SEND MAP (remis à l'intérieur du composant)
+  /// 📡 SEND MAP
   useEffect(() => {
     // Ne met à jour la WebView que si l'application est en premier plan
     // et que le ref de la webview est disponible.
@@ -230,15 +242,18 @@ export default function Tracker() {
 
   // ▶️ START
   const startTracking = async () => {
-    // Réinitialiser l'état UI
+    // Réinitialiser l'état UI complètement
     setDistance(0);
     setTimeElapsed(0);
     setPath([]);
-    setCurrentSpeed(0);
+
+    // Reset de la vitesse à null pour éviter le smoothing précédent
+    setCurrentSpeed(null);
     lastTimestamp.current = null;
+    lastBearing.current = null; // Reset le dernier bearing
 
     startTimeRef.current = Date.now();
-    await AsyncStorage.setItem(ASYNC_STORAGE_START_TIME, startTimeRef.current.toString()); // Persister le temps de début
+    await AsyncStorage.setItem(ASYNC_STORAGE_START_TIME, startTimeRef.current.toString());
 
     timerRef.current = setInterval(() => {
       if (startTimeRef.current) {
@@ -253,10 +268,8 @@ export default function Tracker() {
 
       await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
         accuracy: Location.Accuracy.BestForNavigation,
-        distanceInterval: 5, // 5 Mètres en production
-        timeInterval: LOCATION_UPDATE_INTERVAL, // Millisecondes
-        deferredUpdatesInterval: 5000,
-        deferredUpdatesDistance: 5, // 5 en production
+        distanceInterval: 1,
+        timeInterval: LOCATION_UPDATE_INTERVAL,
         showsBackgroundLocationIndicator: true,
         foregroundService: {
           notificationTitle: 'Tracking de la course',
@@ -264,70 +277,98 @@ export default function Tracker() {
           notificationColor: '#216161',
           killServiceOnDestroy: true,
         },
-        activityType: Location.ActivityType.OtherNavigation,
+        activityType: Location.ActivityType.Fitness,
         pausesUpdatesAutomatically: false,
       });
 
       setIsTracking(true);
-      Alert.alert("Tracking démarré", "Le suivi GPS est maintenant actif en arrière-plan. Une notification est visible.");
 
       // Démarrer le watchPositionAsync pour mettre à jour l'UI en premier plan
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
           timeInterval: LOCATION_UPDATE_INTERVAL,
-          distanceInterval: 5
+          distanceInterval: 1
         },
         (location) => {
           const { latitude, longitude, accuracy, speed: gpsSpeed } = location.coords;
+
+          // Ignorer si précision GPS est mauvaise
           if (accuracy != null && accuracy > MAX_ACCURACY) return;
 
           const now = location.timestamp;
           const newPoint = { latitude, longitude };
 
           setPath(prev => {
-            if (prev.length === 0) return [newPoint];
+            if (prev.length === 0) {
+              lastTimestamp.current = now; // Initialise lastTimestamp pour la première position
+              return [newPoint];
+            }
             const last = prev[prev.length - 1];
             const d = calculateDistance(last.latitude, last.longitude, latitude, longitude);
 
+            // Seuil de distance : éviter les positions bruitées
             if (d < MIN_DISTANCE) return prev;
 
             let speed = 0;
 
-            if (lastTimestamp.current) {
-              const dt = (now - lastTimestamp.current) / 1000;
-              if (dt > 0) speed = (d / dt) * 3600;
+            if (lastTimestamp.current && now >= lastTimestamp.current) {
+              const dt = (now - lastTimestamp.current) / 1000; // en secondes
+
+              // Éviter la division par zéro
+              if (dt > 0.5) { // Minimum 0.5s entre deux positions
+                speed = (d / dt) * 3.6; // km/h
+              }
             }
 
             lastTimestamp.current = now;
 
-            const gpsSpeedKmh = gpsSpeed && gpsSpeed > 0 ? gpsSpeed * 3.6 : 0;
-            const finalSpeed = gpsSpeedKmh > 0 ? gpsSpeedKmh : speed;
+            // Utiliser la vélocité GPS si disponible et valide, sinon le calcul distance/temps
+            const gpsSpeedKmh = (gpsSpeed && typeof gpsSpeed === 'number' && gpsSpeed > 0) ? gpsSpeed * 3.6 : null;
 
-            // UTILISATEUR À L'ARRÊT
-            if (d < 0.003 || finalSpeed < 1) {
+            // Préférer GPS si vitesse calculée est trop faible (bruit de GPS)
+            const finalSpeed = (gpsSpeedKmh !== null && gpsSpeedKmh > speed * 1.5) ? gpsSpeedKmh : speed;
+
+            // ✅ ARRÊT INTELLIGENT : Reset la vitesse à 0 si l'utilisateur s'arrête
+            if (d < 0.003 || finalSpeed < 0.1) {
               setCurrentSpeed(0);
               return prev;
             }
 
-            if (finalSpeed > MAX_SPEED) {
-              return prev;
+            // Limiter MAX_SPEED uniquement pour la boucle, pas pour l'affichage
+            const smoothedFinalSpeed = Math.min(finalSpeed, MAX_SPEED);
+
+            // ✅ Smoothed speed avec reset complet à 0 quand on est à l'arrêt
+            let nextSpeed = 0;
+            if (currentSpeed === null) {
+              // Première position : utiliser la vitesse réelle
+              nextSpeed = smoothedFinalSpeed;
+            } else {
+              // Appliquer le smoothing seulement si on bouge
+              nextSpeed = currentSpeed * 0.3 + smoothedFinalSpeed * 0.7;
             }
 
-            if (finalSpeed > MAX_SPEED) return prev;
-
-            setCurrentSpeed(prevSpeed =>
-              prevSpeed * 0.3 + finalSpeed * 0.7
-            );
-
-            const raw: number = getBearing(last.latitude, last.longitude, latitude, longitude);
-            const smoothBearing = lastBearing.current + (raw - lastBearing.current) * 0.2;
-            lastBearing.current = smoothBearing;
-            setBearing(smoothBearing);
+            setCurrentSpeed(nextSpeed);
+            const rawBearing = getBearing(last.latitude, last.longitude, latitude, longitude);
+            if (rawBearing !== null) {
+              let smoothBearing;
+              if (lastBearing.current === null) {
+                smoothBearing = rawBearing;
+              } else {
+                // Smoothing du bearing. Gérer le passage de 359 à 0 degrés
+                let diff = rawBearing - lastBearing.current;
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+                smoothBearing = (lastBearing.current + diff * 0.2 + 360) % 360;
+              }
+              lastBearing.current = smoothBearing;
+              setBearing(smoothBearing);
+            }
 
             setDistance(dist => dist + d);
             return [...prev, newPoint];
           });
+
           setCurrentLocation(newPoint);
         }
       );
@@ -338,8 +379,14 @@ export default function Tracker() {
       // Nettoyer en cas d'échec
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       startTimeRef.current = null;
+      lastBearing.current = null; // Reset bearing en cas d'échec
       await AsyncStorage.multiRemove([ASYNC_STORAGE_RP_ID, ASYNC_STORAGE_RP_KEY, ASYNC_STORAGE_START_TIME]);
     }
+  };
+
+  const handleStart = () => {
+    setModalVisible(true);
+    startTracking();
   };
 
   // ⏹ STOP
@@ -362,6 +409,7 @@ export default function Tracker() {
         timerRef.current = null;
       }
       startTimeRef.current = null; // Réinitialiser le temps de début
+      lastBearing.current = null; // Réinitialiser le bearing
 
       // Nettoyer les données persistantes du tracking
       await AsyncStorage.multiRemove([ASYNC_STORAGE_RP_ID, ASYNC_STORAGE_RP_KEY, ASYNC_STORAGE_START_TIME]);
@@ -373,25 +421,16 @@ export default function Tracker() {
       setDistance(0);
       setTimeElapsed(0);
       setPath([]);
-      setCurrentSpeed(0);
+      setCurrentSpeed(null); // Utilisez null pour indiquer l'état initial
       setBearing(0);
       setCurrentLocation(INIT_LOCATION);
+
+      // Fermer le modal si ouvert
+      setModalVisible(false);
     } catch (e) {
       console.error('Error stopping location updates:', e);
       Alert.alert("Erreur", "Impossible d'arrêter le suivi GPS.");
     }
-  };
-
-  // Helper pour formater le temps en HH:MM:SS
-  const formatTime = (totalSeconds: number) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    return [hours, minutes, seconds]
-      .map(v => v < 10 ? "0" + v : v)
-      .filter((v, i) => v !== "00" || i > 0)
-      .join(":");
   };
 
   // Rendu conditionnel pendant le chargement de la position initiale
@@ -404,14 +443,47 @@ export default function Tracker() {
     );
   }
 
+  // Ouvrir le lien externe dans le navigateur par défaut
+  const handleOpenExternalLink = () => {
+    const url = `${apiMapsViewerURL}/${apiViewerId}`;
+    Linking.openURL(url).catch(err => console.error("Failed to open URL:", err));
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.pageInformations}>Event id: {raceEventId} - Race id: {raceId} - Participant id: {raceParticipantId} - Participant key: {raceParticipantKey}</Text>
 
-      <LeafletMap webviewRef={webviewRef} />
+      <View style={styles.titleContainer}>
+        <Text style={styles.titleText}>{raceEventName}</Text>
+      </View>
+
+      <View style={styles.pageInformations}>
+        <Text style={styles.pageInformationsText}>Course: {raceCurrentName}</Text>
+        <Text style={styles.pageInformationsText}>Votre clé: {raceParticipantKey}</Text>
+      </View>
+
+      <View style={styles.trackingInformations}>
+        <Text style={styles.trackingInformationsText}>
+          <Ionicons name="flame" size={24} color="#0A0F0E" /> Bienvenue {raceParticipantName} !
+        </Text>
+        <Text style={styles.trackingInformationsText}>
+          Vous permettrez à vos proches et aux organisateurs de suivre votre progression en temps réel sur la carte.
+        </Text>
+        <TouchableOpacity onPress={handleOpenExternalLink} style={styles.btnLink}>
+          <Text style={styles.btnLinkText}><Ionicons name="eye" size={18} color="white" /> Voir sur le site</Text>
+        </TouchableOpacity>
+        <Text style={styles.trackingInformationsText}>
+          <Ionicons name="location" size={24} color="#0A0F0E" /> En démarrant le tracking, vous acceptez que votre position soit collectée et partagée en temps réel avec les organisateurs de l'événement et les spectateurs via le site web.
+        </Text>
+        <Text style={styles.trackingInformationsText}>
+          <Ionicons name="phone-portrait" size={24} color="#0A0F0E" /> Assurez-vous d'avoir une bonne connexion GPS, un smartphone avec une batterie suffisante, de garder l'application en avant-plan et de permettre les autorisations nécessaires pour une expérience optimale.
+        </Text>
+        <Text style={styles.trackingInformationsText}>
+          <Ionicons name="rocket" size={24} color="#0A0F0E" /> L'équipe de l'événement vous remercie de votre participation et vous souhaite une excellente course !
+        </Text>
+      </View>
 
       {!isTracking ? (
-        <TouchableOpacity onPress={startTracking} style={[styles.btn, styles.btnStart]}>
+        <TouchableOpacity onPress={handleStart} style={[styles.btn, styles.btnStart]}>
           <Text style={styles.btnText}><Ionicons name="play" size={26} color="white" /> Démarrer le tracking</Text>
         </TouchableOpacity>
       ) : (
@@ -420,46 +492,74 @@ export default function Tracker() {
         </TouchableOpacity>
       )}
 
-      <View style={styles.infos}>
-        <View style={styles.row}>
-          <View style={styles.card}>
-            <Text style={styles.label}>Distance</Text>
-            <Text style={styles.value}>{distance.toFixed(2)}</Text>
-            <Text style={styles.unit}>km</Text>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.label}>Temps</Text>
-            <Text style={styles.value}>{formatTime(timeElapsed)}</Text>
-            <Text style={styles.unit}></Text>
-          </View>
-        </View>
-
-        <View style={styles.row}>
-          <View style={styles.card}>
-            <Text style={styles.label}>Vitesse actuelle</Text>
-            <Text style={[styles.value, { color: "#FFCE39" }]}>
-              {currentSpeed.toFixed(2)}
-            </Text>
-            <Text style={styles.unit}>km/h</Text>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.label}>Vitesse moyenne</Text>
-            <Text style={styles.value}>
-              {(timeElapsed > 0 ? distance / (timeElapsed / 3600) : 0).toFixed(2)}
-            </Text>
-            <Text style={styles.unit}>km/h</Text>
-          </View>
-        </View>
-      </View>
+      {/* Navigation Modal */}
+      <NavigationModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSwipeUnlocked={() => setModalVisible(false)}
+        data={{
+          currentLocation,
+          distance,
+          timeElapsed,
+          path,
+          bearing,
+          currentSpeed,
+          raceEventId,
+          raceParticipantKey,
+          webviewRef
+        }}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#E3E5E7', paddingVertical: 40, paddingHorizontal: 10 },
-  pageInformations: { fontSize: 12, fontWeight: 'bold', marginBottom: 10 },
+  container: {
+    flex: 1,
+    backgroundColor: '#E3E5E7',
+    paddingVertical: 40,
+    paddingHorizontal: 15
+  },
+  titleContainer: {
+    backgroundColor: '#0A0F0E',
+    borderRadius: 18,
+    padding: 10,
+    marginBottom: 15,
+    display: 'flex',
+    alignItems: 'center'
+  },
+  titleText: {
+    fontSize: 20,
+    color: '#f8f9ff',
+    fontWeight: 'bold'
+  },
+  pageInformations: {
+    padding: 20,
+    display: 'flex',
+    flexDirection: 'column',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    borderRadius: 18,
+    backgroundColor: '#f8f9ff',
+    elevation: 3,
+  },
+  pageInformationsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0A0F0E',
+    marginBottom: 5,
+  },
+  trackingInformations: {
+    paddingHorizontal: 20,
+    color: '#0A0F0E',
+    marginBottom: 10,
+  },
+  trackingInformationsText: {
+    fontSize: 16,
+    marginVertical: 8,
+    lineHeight: 22,
+  },
   btn: {
     display: 'flex',
     alignItems: "center",
@@ -467,44 +567,38 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 60,
     alignSelf: "center",
-    marginTop: 20,
-    borderRadius: 40,
-    elevation: 3,
-  },
-  btnBattery: {
-    display: 'flex',
-    alignItems: "center",
-    justifyContent: "center",
-    width: '100%',
-    height: 60,
-    alignSelf: "center",
-    marginTop: 20,
+    marginTop: 15,
     borderRadius: 40,
     elevation: 3,
     backgroundColor: "#5a12d6",
   },
-  btnText: { fontSize: 20, color: '#f8f9ff', fontWeight: 'bold' },
-  btnStart: { backgroundColor: "#216161" },
-  btnStop: { backgroundColor: "#FE4B32" },
-  infos: { marginTop: 20, paddingHorizontal: 15 },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
+  btnText: {
+    fontSize: 20,
+    color: '#f8f9ff',
+    fontWeight: 'bold'
   },
-  card: {
-    flex: 1,
+  btnLink: {
     backgroundColor: "#0A0F0E",
-    borderRadius: 16,
-    padding: 15,
-    marginHorizontal: 3,
+    marginVertical: 5,
+    height: 45,
+    width: '60%',
+    display: 'flex',
     alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 40,
     elevation: 3,
   },
-  label: { fontSize: 16, color: "#E3E5E7" },
-  value: { fontSize: 28, fontWeight: "bold", color: "#E3E5E7" },
-  unit: { fontSize: 12, color: "#E3E5E7" },
-
+  btnLinkText: {
+    fontSize: 14,
+    color: '#f8f9ff',
+    fontWeight: 'bold'
+  },
+  btnStart: {
+    backgroundColor: "#216161"
+  },
+  btnStop: {
+    backgroundColor: "#FE4B32"
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -514,6 +608,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 18,
-    color: '#555',
+    color: '#0A0F0E',
   },
 });

@@ -223,8 +223,20 @@ export default function RaceScreen() {
                   <Text style={styles.participantText}><Ionicons name="boat" size={20} /> Bib: {participant.rp_bib}</Text>
                   <Text style={styles.participantText}><Ionicons name="person-circle" size={20} /> Nom: {participant.rp_name}</Text>
                   {localKeys?.includes(participant.rp_key) &&
-                    <Link href={{ pathname: "/tracker/[id]", params:{ id: participant.rp_ra_id, eventId: eventId, participantId: participant.rp_id, participantKey: participant.rp_key } }} style={styles.trackerLink} >
-                      <Ionicons name="play-circle-outline" size={20} /> <Text>Accéder au tracker</Text> 
+                    <Link href={{
+                      pathname: "/tracker/[id]",
+                      params: {
+                        id: participant.rp_ra_id,
+                        eventId: eventId,
+                        eventName: raceEvent?.re_event_name,
+                        participantId: participant.rp_id,
+                        participantName: participant.rp_name,
+                        participantKey: participant.rp_key,
+                        raceName: race.ra_name,
+                        viewerId: raceEvent?.re_event_random_id_viewer
+                      }
+                    }} style={styles.trackerLink} >
+                      <Ionicons name="location" size={20} /> <Text>Accéder au tracker</Text>
                     </Link>
                   }
                 </View>
@@ -251,7 +263,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
-    backgroundColor: "#7594A8",
+    backgroundColor: "#0A0F0E",
     color: "#f5f7ff",
     borderRadius: 8,
   },
@@ -341,6 +353,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   trackerLink: {
+    textAlign: 'center',
     height: 60,
     marginTop: 5,
     paddingTop: 16,
@@ -348,6 +361,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#216161',
     color: '#f0f4f7',
     fontSize: 18,
+    fontWeight: 'bold',
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
