@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     color: "#f5f7ff",
     borderRadius: 8,
   },
-  card: {
+  card: { // Styles pour les EventCard (peut-être redondant ici, si EventCard a ses propres styles)
     backgroundColor: "#f5f7ff",
     padding: 15,
     borderRadius: 12,
