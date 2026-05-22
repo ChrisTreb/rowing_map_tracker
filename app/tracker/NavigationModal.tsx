@@ -179,7 +179,7 @@ export default function NavigationModal({
         <View style={styles.swipeWrapper} pointerEvents="box-none">
           <View style={styles.swipeTrack}>
             <Text style={styles.swipeText}>
-              Swipe → pour quitter
+              Glisser → pour quitter
             </Text>
             <View
               style={styles.swipeGestureLayer}

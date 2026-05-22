@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
 import * as TaskManager from 'expo-task-manager';
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, AppState, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
 import NavigationModal from './NavigationModal';
 
@@ -25,6 +25,7 @@ const ASYNC_STORAGE_START_TIME = 'tracking_start_time';
 
 // API configuration
 const apiURL = process.env.EXPO_PUBLIC_API_URL;
+const apiMapsViewerURL = process.env.EXPO_PUBLIC_API_MAPS_URL;
 
 const INIT_LOCATION: Position = { latitude: 48.39, longitude: -4.48 };
 
@@ -115,7 +116,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
 
     if (storedParticipantId && storedParticipantKey) {
-      
+
       for (const location of locations) {
 
         console.log('POSITION:', new Date(location.timestamp).toISOString());
@@ -135,11 +136,15 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
 export default function Tracker() {
 
-  const { id, eventId, participantId, participantKey } = useLocalSearchParams();
+  const { id, eventId, eventName, participantId, participantName, participantKey, raceName, viewerId } = useLocalSearchParams();
   const raceId = parseInt(id as string);
   const raceEventId = parseInt(eventId as string);
+  const raceEventName = eventName;
   const raceParticipantId = parseInt(participantId as string);
+  const raceParticipantName = participantName;
   const raceParticipantKey = participantKey;
+  const raceCurrentName = raceName;
+  const apiViewerId = viewerId;
 
   const [currentLocation, setCurrentLocation] = useState<Position>(INIT_LOCATION);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
@@ -281,7 +286,7 @@ export default function Tracker() {
         {
           accuracy: Location.Accuracy.BestForNavigation,
           timeInterval: LOCATION_UPDATE_INTERVAL,
-          distanceInterval: 5
+          distanceInterval: 1
         },
         (location) => {
           const { latitude, longitude, accuracy, speed: gpsSpeed } = location.coords;
@@ -426,18 +431,6 @@ export default function Tracker() {
     }
   };
 
-  // Helper pour formater le temps en HH:MM:SS
-  const formatTime = (totalSeconds: number) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    return [hours, minutes, seconds]
-      .map(v => v < 10 ? "0" + v : v)
-      .filter((v, i) => v !== "00" || i > 0)
-      .join(":");
-  };
-
   // Rendu conditionnel pendant le chargement de la position initiale
   if (isLoadingLocation) {
     return (
@@ -448,9 +441,44 @@ export default function Tracker() {
     );
   }
 
+  // Ouvrir le lien externe dans le navigateur par défaut
+  const handleOpenExternalLink = () => {
+    const url = `${apiMapsViewerURL}/${apiViewerId}`;
+    Linking.openURL(url).catch(err => console.error("Failed to open URL:", err));
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.pageInformations}>Event id: {raceEventId} - Race id: {raceId} - Participant id: {raceParticipantId} - Participant key: {raceParticipantKey}</Text>
+
+      <View style={styles.titleContainer}>
+        <Text style={styles.titleText}>{raceEventName}</Text>
+      </View>
+
+      <View style={styles.pageInformations}>
+        <Text style={styles.pageInformationsText}>Course: {raceCurrentName}</Text>
+        <Text style={styles.pageInformationsText}>Votre clé: {raceParticipantKey}</Text>
+      </View>
+
+      <View style={styles.trackingInformations}>
+        <Text style={styles.trackingInformationsText}>
+          <Ionicons name="flame" size={24} color="#0A0F0E" /> Bienvenue {raceParticipantName} !
+        </Text>
+        <Text style={styles.trackingInformationsText}>
+          Vous permettrez à vos proches et aux organisateurs de suivre votre progression en temps réel sur la carte.
+        </Text>
+        <TouchableOpacity onPress={handleOpenExternalLink} style={styles.btnLink}>
+          <Text style={styles.btnLinkText}><Ionicons name="eye" size={18} color="white" /> Voir sur le site</Text>
+        </TouchableOpacity>
+        <Text style={styles.trackingInformationsText}>
+          <Ionicons name="location" size={24} color="#0A0F0E" /> En démarrant le tracking, vous acceptez que votre position soit collectée et partagée en temps réel avec les organisateurs de l'événement et les spectateurs via le site web.
+        </Text>
+        <Text style={styles.trackingInformationsText}>
+          <Ionicons name="phone-portrait" size={24} color="#0A0F0E" /> Assurez-vous d'avoir une bonne connexion GPS, un smartphone avec une batterie suffisante, de garder l'application en avant-plan et de permettre les autorisations nécessaires pour une expérience optimale.
+        </Text>
+        <Text style={styles.trackingInformationsText}>
+          <Ionicons name="rocket" size={24} color="#0A0F0E" /> L'équipe de l'événement vous remercie de votre participation et vous souhaite une excellente course !
+        </Text>
+      </View>
 
       {!isTracking ? (
         <TouchableOpacity onPress={handleStart} style={[styles.btn, styles.btnStart]}>
@@ -484,8 +512,51 @@ export default function Tracker() {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#E3E5E7', paddingVertical: 40, paddingHorizontal: 10 },
-  pageInformations: { fontSize: 12, fontWeight: 'bold', marginBottom: 10 },
+  container: {
+    flex: 1,
+    backgroundColor: '#E3E5E7',
+    paddingVertical: 40,
+    paddingHorizontal: 15
+  },
+  titleContainer: {
+    backgroundColor: '#0A0F0E',
+    borderRadius: 18,
+    padding: 15,
+    marginBottom: 20,
+    display: 'flex',
+    alignItems: 'center'
+  },
+  titleText: {
+    fontSize: 20,
+    color: '#f8f9ff',
+    fontWeight: 'bold'
+  },
+  pageInformations: {
+    padding: 20,
+    display: 'flex',
+    flexDirection: 'column',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    borderRadius: 18,
+    backgroundColor: '#f8f9ff',
+  },
+  pageInformationsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0A0F0E',
+    marginBottom: 5,
+  },
+  trackingInformations: {
+    paddingHorizontal: 20,
+    color: '#0A0F0E',
+    marginBottom: 10,
+  },
+  trackingInformationsText: {
+    fontSize: 16,
+    marginVertical: 8,
+    lineHeight: 22,
+  },
   btn: {
     display: 'flex',
     alignItems: "center",
@@ -497,14 +568,32 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     elevation: 3,
   },
-  btnText: { fontSize: 20, color: '#f8f9ff', fontWeight: 'bold' },
-  btnStart: { backgroundColor: "#216161" },
-  btnStop: { backgroundColor: "#FE4B32" },
-  infos: { marginTop: 20, paddingHorizontal: 15 },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
+  btnText: {
+    fontSize: 20,
+    color: '#f8f9ff',
+    fontWeight: 'bold'
+  },
+  btnLink: {
+    backgroundColor: "#0A0F0E",
+    marginVertical: 10,
+    height: 45,
+    width: '60%',
+    display: 'flex',
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 40,
+    elevation: 3,
+  },
+  btnLinkText: {
+    fontSize: 14,
+    color: '#f8f9ff',
+    fontWeight: 'bold'
+  },
+  btnStart: {
+    backgroundColor: "#216161"
+  },
+  btnStop: {
+    backgroundColor: "#FE4B32"
   },
   loadingContainer: {
     flex: 1,
@@ -515,6 +604,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 18,
-    color: '#555',
+    color: '#0A0F0E',
   },
 });
