@@ -521,8 +521,8 @@ const styles = StyleSheet.create({
   titleContainer: {
     backgroundColor: '#0A0F0E',
     borderRadius: 18,
-    padding: 15,
-    marginBottom: 20,
+    padding: 10,
+    marginBottom: 15,
     display: 'flex',
     alignItems: 'center'
   },
@@ -540,6 +540,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 18,
     backgroundColor: '#f8f9ff',
+    elevation: 3,
   },
   pageInformationsText: {
     fontSize: 18,
@@ -564,7 +565,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 60,
     alignSelf: "center",
-    marginTop: 20,
+    marginTop: 15,
     borderRadius: 40,
     elevation: 3,
   },
@@ -575,7 +576,7 @@ const styles = StyleSheet.create({
   },
   btnLink: {
     backgroundColor: "#0A0F0E",
-    marginVertical: 10,
+    marginVertical: 5,
     height: 45,
     width: '60%',
     display: 'flex',

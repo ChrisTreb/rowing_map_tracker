@@ -113,10 +113,7 @@ export default function NavigationModal({
       visible={visible}
       animationType="slide"
       onRequestClose={() => {
-        Alert.alert(
-          "Tracking sécurisé",
-          "Utilisez le swipe pour débloquer."
-        );
+        Alert.alert("Tracking sécurisé", "Utilisez le swipe pour débloquer.");
       }}
     >
       <View style={styles.container}>
@@ -130,32 +127,23 @@ export default function NavigationModal({
         <View>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Navigation</Text>
-            <Text style={styles.headerSubtitle}>
-              Participant #{data.raceParticipantKey}
-            </Text>
+            <Text style={styles.headerSubtitle}>Participant #{data.raceParticipantKey}</Text>
           </View>
 
           <View style={styles.grid}>
-
             <View style={styles.card}>
               <Text style={styles.label}>Distance</Text>
-              <Text style={styles.value}>
-                {data.distance.toFixed(2)}
-              </Text>
+              <Text style={styles.value}>{data.distance.toFixed(2)}</Text>
               <Text style={styles.unit}>km</Text>
             </View>
 
             <View style={styles.card}>
               <Text style={styles.label}>Temps</Text>
-              <Text style={styles.value}>
-                {formatTime(data.timeElapsed)}
-              </Text>
+              <Text style={styles.value}>{formatTime(data.timeElapsed)}</Text>
             </View>
-
           </View>
 
           <View style={styles.grid}>
-
             <View style={styles.card}>
               <Text style={styles.label}>Vitesse</Text>
               <Text style={[styles.value, { color: '#FFCE39' }]}>
@@ -166,38 +154,19 @@ export default function NavigationModal({
 
             <View style={styles.card}>
               <Text style={styles.label}>Direction</Text>
-              <Text style={styles.value}>
-                {Math.round(data.bearing)}
-              </Text>
+              <Text style={styles.value}>{Math.round(data.bearing)}</Text>
               <Text style={styles.unit}>°</Text>
             </View>
-
           </View>
         </View>
 
         {/* SWIPE */}
         <View style={styles.swipeWrapper} pointerEvents="box-none">
           <View style={styles.swipeTrack}>
-            <Text style={styles.swipeText}>
-              Glisser → pour quitter
-            </Text>
-            <View
-              style={styles.swipeGestureLayer}
-              {...panResponder.panHandlers}
-            >
-              <Animated.View
-                style={[
-                  styles.swipeHandle,
-                  {
-                    transform: [{ translateX }]
-                  }
-                ]}
-              >
-                <Ionicons
-                  name="chevron-forward"
-                  size={32}
-                  color="white"
-                />
+            <Text style={styles.swipeText}>Glisser → pour quitter</Text>
+            <View style={styles.swipeGestureLayer} {...panResponder.panHandlers} >
+              <Animated.View style={[ styles.swipeHandle, {transform: [{ translateX }]} ]} >
+                <Ionicons name="chevron-forward" size={32} color="white" />
               </Animated.View>
             </View>
           </View>
