@@ -9,12 +9,6 @@ import { getDb } from './database';
  */
 
 /**
- * @typedef {object} RowingClub
- * @property {number} rc_id
- * @property {string} rc_name
- * @property {string} rc_nickname
- */
-/**
  * Ajoute une nouvelle course à la base de données.
  * @param {number} ra_id L'ID de la course, généré en externe.
  * @param {number} ra_re_id L'ID de l'événement de course associé.
