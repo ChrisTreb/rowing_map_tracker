@@ -112,8 +112,6 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
     console.log('Locations array in task manager:', locations);
 
-    console.log('Task manager latest location get first:', latestLocation);
-
     const storedParticipantId = await AsyncStorage.getItem(ASYNC_STORAGE_RP_ID);
     const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
 
