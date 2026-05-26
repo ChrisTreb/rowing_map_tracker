@@ -5,8 +5,8 @@ import { initDb } from "../services/database";
 import { DbPhoneRpKey, addPhoneRpKey, deleteExpiredPhoneRpKeys, getPhoneRpKeys, updatePhoneRpKey } from "../services/phoneKeys";
 import { DbRaceEvent, addRaceEvent, getRaceEventById, getRaceEvents, updateRaceEvent } from "../services/raceEvent";
 import { RaceEvent } from "../types/RaceEvent";
+import { debugLog } from "../utils/logUtils";
 import EventCard from "./components/EventCard";
-
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(true); // État pour indiquer le chargement/la synchronisation
@@ -35,7 +35,7 @@ const Index = () => {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        console.error(`API Error (raceevents/forkeys): ${response.status} ${response.statusText}`, errorBody);
+        debugLog("ERROR", `API Error (raceevents/forkeys): ${response.status} ${response.statusText}`, errorBody);
         throw new Error(`Failed to fetch race events: ${response.status} ${response.statusText}`);
       }
 
@@ -80,7 +80,7 @@ const Index = () => {
               event.nb_participants,
               event.my_rp_key
             );
-            console.log(`Event with ID ${event.re_id} updated.`);
+            debugLog("INFO", `Event with ID ${event.re_id} updated.`);
           } else {
             // Ajouter le nouvel événement
             await addRaceEvent(
@@ -103,7 +103,7 @@ const Index = () => {
               event.nb_participants,
               event.my_rp_key
             );
-            console.log(`Event with ID ${event.re_id} added.`);
+            debugLog("INFO", `Event with ID ${event.re_id} added.`);
           }
 
           // Ajouter/Mettre à jour la clé de participant à la table phone_rp_keys si elle n'existe pas déjà et si elle est valide
@@ -111,15 +111,15 @@ const Index = () => {
             const existingKey = currentPhoneRpKeys?.find(key => key.prk_rp_key === event.my_rp_key);
             if (!existingKey) {
               await addPhoneRpKey(event.my_rp_key, event.re_id, event.re_event_end_date_and_time);
-              console.log(`Added new phone RP key: ${event.my_rp_key}`);
+              debugLog("INFO", `Added new phone RP key: ${event.my_rp_key}`);
             } else {
               // Mettre à jour la date d'expiration si la clé existe déjà
               await updatePhoneRpKey(event.re_id, event.re_event_end_date_and_time, event.my_rp_key);
-              console.log(`Updated phone RP key: ${event.my_rp_key}`);
+              debugLog("INFO", `Updated phone RP key: ${event.my_rp_key}`);
             }
           }
         } catch (error) {
-          console.error(`Error syncing event ${event.re_id} to local database:`, error);
+          debugLog("ERROR", `Error syncing event ${event.re_id} to local database:`, error);
           throw error; // Propager l'erreur pour que Promise.allSettled la capture
         }
       });
@@ -130,14 +130,14 @@ const Index = () => {
       // Log des résultats pour le débogage
       results.forEach((result, index) => {
         if (result.status === 'rejected') {
-          console.error(`Synchronisation de l'événement ${apiRaceEvents[index]?.re_id} échouée:`, result.reason);
+          debugLog("ERROR", `Synchronisation de l'événement ${apiRaceEvents[index]?.re_id} échouée:`, result.reason);
         }
       });
 
-      console.log("Synchronisation des événements terminée.");
+      debugLog("INFO", "Synchronisation des événements terminée.");
       return foundMatchingCode; // Retourne la validité du code
     } catch (error) {
-      console.error("Error fetching or syncing race events:", error);
+      debugLog("ERROR", "Error fetching or syncing race events:", error);
       Alert.alert("Erreur de synchronisation", "Impossible de récupérer les événements. Veuillez vérifier votre connexion.");
       return false; // Retourne false en cas d'erreur
     }
@@ -154,7 +154,7 @@ const Index = () => {
       );
       setDbEvents(eventsFromDb);
     } catch (error) {
-      console.error("Error retrieving race events from local database:", error);
+      debugLog("ERROR", "Error retrieving race events from local database:", error);
     }
   };
 
@@ -164,20 +164,20 @@ const Index = () => {
       try {
         setIsLoading(true);
         await initDb();
-        console.log("Database initialized successfully.");
+        debugLog("INFO", "Database initialized successfully.");
         // Supprimer les clés de participant expirées avant de charger les événements
         await deleteExpiredPhoneRpKeys();
-        console.log("Expired phone RP keys deleted.");
+        debugLog("INFO", "Expired phone RP keys deleted.");
         // Synchronisation initiale avec un code vide ou par défaut pour charger les événements sans code spécifique
         await syncApiRaceEventsToLocalDb("____"); // Votre placeholder pour charger les événements par défaut
-        console.log("API events synced to local database.");
+        debugLog("INFO", "API events synced to local database.");
         // Charger les événements locaux après la synchronisation
         await loadLocalRaceEvents();
-        console.log("Local events loaded into state.");
+        debugLog("INFO", "Local events loaded into state.");
         // Déclencher un rafraîchissement initial pour les EventCards
         setRefreshEventCardsTrigger(prev => prev + 1);
       } catch (error) {
-        console.error("Database initialization or initial sync failed:", error);
+        debugLog("ERROR", "Database initialization or initial sync failed:", error);
         Alert.alert("Erreur", "Problème d'initialisation de l'application. Réessayez.");
       } finally {
         setIsLoading(false);
@@ -218,9 +218,9 @@ const Index = () => {
         // Pas besoin de setIsCodeValid(false) ici, car c'est déjà la valeur actuelle
       }
 
-      console.log("Participant code submitted and processed.");
+      debugLog("INFO", "Participant code submitted and processed.");
     } catch (error) {
-      console.error("Error during participant code submission:", error);
+      debugLog("ERROR", "Error during participant code submission:", error);
       Alert.alert("Erreur", "Une erreur est survenue lors de la soumission du code. Veuillez réessayer.");
       setIsCodeValid(false); // S'assurer que l'état est correct en cas d'erreur
     } finally {

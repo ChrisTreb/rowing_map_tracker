@@ -1,4 +1,4 @@
-// @ts-check
+import { debugLog } from '../utils/logUtils';
 import { getDb } from './database';
 
 /**
@@ -29,10 +29,10 @@ export const addUser = async (
       `INSERT INTO user (usr_id, usr_name, usr_apikey, usr_rc_id) VALUES (?, ?, ?, ?)`,
       [usr_id, usr_name, usr_apikey, usr_rc_id]
     );
-    console.log("User added:", usr_id);
+    debugLog("INFO", "User added:", usr_id);
     return usr_id;
   } catch (error) {
-    console.error("Error adding user:", error);
+    debugLog("ERROR", "Error adding user:", error);
     throw error;
   }
 };
@@ -51,7 +51,7 @@ export const getUserById = async (usr_id) => {
     );
     return /** @type {DbUser | null} */ (result);
   } catch (error) {
-    console.error("Error fetching user by ID:", error);
+    debugLog("ERROR", "Error fetching user by ID:", error);
     throw error;
   }
 };
@@ -72,7 +72,7 @@ export const updateUser = async (usr_id, usr_name, usr_apikey, usr_rc_id) => {
       [usr_name, usr_apikey, usr_rc_id, usr_id]
     );
   } catch (error) {
-    console.error("Error updating user:", error);
+    debugLog("ERROR", "Error updating user:", error);
     throw error;
   }
 };
@@ -90,7 +90,7 @@ export const deleteUser = async (usr_id) => {
       [usr_id]
     );
   } catch (error) {
-    console.error("Error deleting user:", error);
+    debugLog("ERROR", "Error deleting user:", error);
     throw error;
   }
 };

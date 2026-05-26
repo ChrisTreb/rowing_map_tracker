@@ -1,3 +1,4 @@
+import { debugLog } from '../utils/logUtils';
 import { getDb } from './database';
 
 /**
@@ -30,10 +31,10 @@ export const addRace = async (
       [ra_id, ra_re_id, ra_type, ra_name]
     );
 
-    console.log("Race added:", ra_id);
+    debugLog("INFO", "Race added:", ra_id);
     return ra_id;
   } catch (error) {
-    console.error("Error adding race:", error);
+    debugLog("ERROR", "Error adding race:", error);
     throw error;
   }
 };
@@ -48,10 +49,10 @@ export const getRaces = async () => {
     const result = await db.getAllAsync(
       `SELECT * FROM race ORDER BY ra_id DESC`
     );
-    console.log("Races fetched:", result);
+    debugLog("INFO", "Races fetched:", result);
     return /** @type {DbRace[]} */ (result); // Cast pour assurer le type
   } catch (error) {
-    console.error("Error fetching races:", error);
+    debugLog("ERROR", "Error fetching races:", error);
     throw error;
   }
 };
@@ -70,7 +71,7 @@ export const getRaceById = async (ra_id) => {
     );
     return /** @type {DbRace | null} */ (result); // Cast pour assurer le type
   } catch (error) {
-    console.error("Error fetching race by ID:", error);
+    debugLog("ERROR", "Error fetching race by ID:", error);
     throw error;
   }
 };
@@ -89,7 +90,7 @@ export const getRacesByEventId = async (ra_re_id) => {
     );
     return /** @type {DbRace[] | null} */ (result); // Cast pour assurer le type
   } catch (error) {
-    console.error("Error fetching race by event ID:", error);
+    debugLog("ERROR", "Error fetching race by event ID:", error);
     throw error;
   }
 };
@@ -114,9 +115,9 @@ export const updateRace = async (
       `UPDATE race SET ra_re_id = ?, ra_type = ?, ra_name = ? WHERE ra_id = ?`,
       [ra_re_id, ra_type, ra_name, ra_id]
     );
-    console.log("Race updated, id:", ra_id);
+    debugLog("INFO", "Race updated, id:", ra_id);
   } catch (error) {
-    console.error("Error updating race:", error);
+    debugLog("ERROR", "Error updating race:", error);
     throw error;
   }
 };

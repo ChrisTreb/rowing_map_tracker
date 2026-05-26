@@ -9,6 +9,7 @@ import * as TaskManager from 'expo-task-manager';
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, AppState, Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WebView } from 'react-native-webview';
+import { debugLog } from '../../utils/logUtils';
 import NavigationModal from './NavigationModal';
 
 // CONFIG
@@ -73,9 +74,9 @@ const globalSaveParticipantPosition = async (
       latitude,
       longitude
     );
-    console.log(`Position saved locally for ${rpp_rp_key}: ${latitude}, ${longitude}`);
+    debugLog("INFO", `Position saved locally for ${rpp_rp_key}: ${latitude}, ${longitude}`);
   } catch (error) {
-    console.error("Failed insertion new position into local database from background task:", error);
+    debugLog("ERROR", "Failed insertion new position into local database from background task:", error);
     return;
   }
 
@@ -92,25 +93,25 @@ const sendCurrentPositionToApi = async (rpp_rp_key: string, latitude: number, lo
       body: JSON.stringify(participantPosition),
     });
 
-    console.log(`Api Post position response code for ${rpp_rp_key}: ${response.status}`);
+    debugLog("INFO", `Api Post position response code for ${rpp_rp_key}: ${response.status}`);
 
   } catch (error) {
-    console.error("Failed posting new position to API from background task:", error);
+    debugLog("ERROR", "Failed posting new position to API from background task:", error);
   }
 }
 
 // --- Définition de la tâche de localisation en arrière-plan ---
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
-  console.log('Task called !');
+  debugLog("INFO", 'Task called !');
 
   if (error) {
-    console.error('LOCATION_TASK_ERROR', error);
+    debugLog("ERROR", 'LOCATION_TASK_ERROR', error);
     return;
   }
   if (data) {
     const { locations } = data as { locations: Location.LocationObject[] };
 
-    console.log('Locations array in task manager:', locations);
+    debugLog("INFO", 'Locations array in task manager:', locations);
 
     const storedParticipantId = await AsyncStorage.getItem(ASYNC_STORAGE_RP_ID);
     const storedParticipantKey = await AsyncStorage.getItem(ASYNC_STORAGE_RP_KEY);
@@ -119,7 +120,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
       for (const location of locations) {
 
-        console.log('POSITION:', new Date(location.timestamp).toISOString());
+        debugLog("INFO", 'POSITION:', new Date(location.timestamp).toISOString());
 
         await globalSaveParticipantPosition(
           parseInt(storedParticipantId),
@@ -129,7 +130,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
         );
       }
     } else {
-      console.warn('Participant ID or Key not found in AsyncStorage for background task. Cannot save position.');
+      debugLog("WARN", 'Participant ID or Key not found in AsyncStorage for background task. Cannot save position.');
     }
   }
 });
@@ -201,7 +202,7 @@ export default function Tracker() {
           longitude: initialLocation.coords.longitude,
         }]);
       } catch (error) {
-        console.error("Failed to get initial location:", error);
+        debugLog("ERROR", "Failed to get initial location:", error);
         Alert.alert("Erreur", "Impossible de récupérer votre position actuelle.");
       } finally {
         setIsLoadingLocation(false); // Fin du chargement de la position initiale
@@ -371,7 +372,7 @@ export default function Tracker() {
         }
       );
     } catch (e) {
-      console.error('Error starting location updates:', e);
+      debugLog("ERROR", 'Error starting location updates:', e);
       Alert.alert("Erreur", "Impossible de démarrer le suivi GPS. Vérifiez les permissions.");
       setIsTracking(false);
       // Nettoyer en cas d'échec
@@ -426,7 +427,7 @@ export default function Tracker() {
       // Fermer le modal si ouvert
       setModalVisible(false);
     } catch (e) {
-      console.error('Error stopping location updates:', e);
+      debugLog("ERROR", 'Error stopping location updates:', e);
       Alert.alert("Erreur", "Impossible d'arrêter le suivi GPS.");
     }
   };
@@ -444,7 +445,7 @@ export default function Tracker() {
   // Ouvrir le lien externe dans le navigateur par défaut
   const handleOpenExternalLink = () => {
     const url = `${apiMapsViewerURL}/${apiViewerId}`;
-    Linking.openURL(url).catch(err => console.error("Failed to open URL:", err));
+    Linking.openURL(url).catch(err => debugLog("ERROR", "Failed to open URL:", err));
   };
 
   return (

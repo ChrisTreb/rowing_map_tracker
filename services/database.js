@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { debugLog } from '../utils/logUtils';
 
 /**
  * @type {SQLite.SQLiteDatabase | null}
@@ -39,9 +40,9 @@ export const dropAllTables = async (db) => {
     `);
     }
 
-    console.log("All tables dropped with success !");
+    debugLog("INFO", "All tables dropped with success !");
   } catch (error) {
-    console.error("Error dropping all tables:", error);
+    debugLog("ERROR", "Error dropping all tables:", error);
   }
 }
 
@@ -142,9 +143,9 @@ export const initDb = async () => {
     `);
     // ... end of existing schema definition ...
 
-    console.log("Database initialized");
+    debugLog("INFO", "Database initialized");
   } catch (error) {
-    console.error("Error initializing database:", error);
+    debugLog("ERROR", "Error initializing database:", error);
     throw error;
   }
 };
@@ -167,9 +168,9 @@ export const resetDatabase = async () => {
       DELETE FROM user;
       DELETE FROM rowing_club;
     `);
-    console.log("Database reset ✅");
+    debugLog("INFO", "Database reset ✅");
   } catch (error) {
-    console.error("Error resetting database:", error);
+    debugLog("ERROR", "Error resetting database:", error);
     throw error;
   }
 };
