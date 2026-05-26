@@ -1,4 +1,5 @@
 // @ts-check
+import { debugLog } from '../utils/logUtils';
 import { getDb } from './database';
 
 /**
@@ -41,10 +42,10 @@ export const addRaceParticipant = async (
       `INSERT INTO race_participant (rp_id, rp_ra_id, rp_re_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [rp_id, rp_ra_id, rp_re_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at]
     );
-    console.log("Race participant added, id:", rp_id);
+    debugLog("INFO", "Race participant added, id:", rp_id);
     return rp_id;
   } catch (error) {
-    console.error("Error adding race participant:", error);
+    debugLog("ERROR", "Error adding race participant:", error);
     throw error;
   }
 };
@@ -63,7 +64,7 @@ export const getRaceParticipantsByEventId = async (rp_re_id) => {
     );
     return /** @type {DbRaceParticipant[] | null} */ (result);
   } catch (error) {
-    console.error("Error fetching race participants by event ID:", error);
+    debugLog("ERROR", "Error fetching race participants by event ID:", error);
     throw error;
   }
 };
@@ -82,7 +83,7 @@ export const getRaceParticipantsByRaceId = async (ra_id) => {
     );
     return /** @type {DbRaceParticipant[] | null} */ (result);
   } catch (error) {
-    console.error("Error fetching race participants by race ID:", error);
+    debugLog("ERROR", "Error fetching race participants by race ID:", error);
     throw error;
   }
 };
@@ -101,7 +102,7 @@ export const getRaceParticipantById = async (rp_id) => {
     );
     return /** @type {DbRaceParticipant | null} */ (result);
   } catch (error) {
-    console.error("Error fetching race participant by ID:", error);
+    debugLog("ERROR", "Error fetching race participant by ID:", error);
     throw error;
   }
 };
@@ -134,9 +135,9 @@ export const updateRaceParticipant = async (
       `UPDATE race_participant SET rp_re_id = ?, rp_ra_id = ?, rp_bib = ?, rp_name = ?, rp_color = ?, rp_key = ?, rp_updated_at = ? WHERE rp_id = ?`,
       [rp_re_id, rp_ra_id, rp_bib, rp_name, rp_color, rp_key, rp_updated_at, rp_id]
     );
-    console.log("Race participant updated, id:", rp_id);
+    debugLog("INFO", "Race participant updated, id:", rp_id);
   } catch (error) {
-    console.error("Error updating race participant:", error);
+    debugLog("ERROR", "Error updating race participant:", error);
     throw error;
   }
 };
@@ -154,7 +155,7 @@ export const deleteRaceParticipant = async (rp_id) => {
       [rp_id]
     );
   } catch (error) {
-    console.error("Error deleting race participant:", error);
+    debugLog("ERROR", "Error deleting race participant:", error);
     throw error;
   }
 };

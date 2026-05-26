@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { DbPhoneRpKey, getPhoneRpKeysByRaceEventId } from "../../services/phoneKeys";
 import { DbRaceEvent } from "../../services/raceEvent";
 import { formatDateTime } from "../../utils/dateUtils";
+import { debugLog } from "../../utils/logUtils";
 
 interface EventCardProps {
   event: DbRaceEvent;
@@ -23,7 +24,7 @@ const EventCard = ({ event, onRefreshTrigger }: EventCardProps) => {
         const keys = await getPhoneRpKeysByRaceEventId(event.re_id);
         setAssociatedKeys(keys);
       } catch (error) {
-        console.error(`Error fetching keys for event ${event.re_id}:`, error);
+        debugLog("ERROR", `Error fetching keys for event ${event.re_id}:`, error);
         setAssociatedKeys([]);
       } finally {
         setKeysLoading(false);

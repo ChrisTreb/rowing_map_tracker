@@ -1,4 +1,5 @@
 // @ts-check
+import { debugLog } from '../utils/logUtils';
 import { getDb } from './database';
 
 /**
@@ -37,10 +38,10 @@ export const addRaceEventTrack = async (
       [ret_id, ret_re_id, ret_name, ret_xml_gpx, ret_color, ret_enabled]
     );
 
-    console.log("Race event track added:", ret_id);
+    debugLog("INFO", "Race event track added:", ret_id);
     return ret_id;
   } catch (error) {
-    console.error("Error adding race event track:", error);
+    debugLog("ERROR", "Error adding race event track:", error);
     throw error;
   }
 };
@@ -59,7 +60,7 @@ export const getRaceEventTracksByRaceEventId = async (re_id) => {
     );
     return /** @type {DbRaceEventTrack[]} */ (result);
   } catch (error) {
-    console.error("Error fetching race event tracks by race event ID:", error);
+    debugLog("ERROR", "Error fetching race event tracks by race event ID:", error);
     throw error;
   }
 };
@@ -78,7 +79,7 @@ export const getRaceEventTrackById = async (ret_id) => {
     );
     return /** @type {DbRaceEventTrack | null} */ (result);
   } catch (error) {
-    console.error("Error fetching race event track by ID:", error);
+    debugLog("ERROR", "Error fetching race event track by ID:", error);
     throw error;
   }
 };
@@ -106,7 +107,7 @@ export const updateRaceEventTrack = async (
       [ret_name, ret_xml_gpx, ret_color, ret_enabled, ret_id]
     );
   } catch (error) {
-    console.error("Error updating race event track:", error);
+    debugLog("ERROR", "Error updating race event track:", error);
     throw error;
   }
 };

@@ -1,4 +1,5 @@
 // @ts-check
+import { debugLog } from '../utils/logUtils';
 import { getDb } from './database';
 
 /**
@@ -73,10 +74,10 @@ export const addRaceEvent = async (
       [re_id, re_user_id, re_event_name, re_event_visibility, re_event_start_date_and_time, re_event_end_date_and_time, re_event_random_id_edit, re_event_random_id_viewer, re_viewport_latitude, re_viewport_longitude, re_viewport_zoom, re_viewport_opacity, re_maplayer, re_marker_timeout, re_tail_timeout, re_flag_content, nb_participants, my_rp_key]
     );
 
-    console.log("Race event added:", re_id);
+    debugLog("INFO", "Race event added:", re_id);
     return re_id;
   } catch (error) {
-    console.error("Error adding race event:", error);
+    debugLog("ERROR", "Error adding race event:", error);
     throw error;
   }
 };
@@ -92,10 +93,10 @@ export const getRaceEvents = async () => {
       `SELECT * FROM race_event ORDER BY re_event_start_date_and_time DESC`
     );
 
-    console.log("Race events fetched:", result);
+    debugLog("INFO", "Race events fetched:", result);
     return /** @type {DbRaceEvent[]} */ (result);
   } catch (error) {
-    console.error("Error fetching race events:", error);
+    debugLog("ERROR", "Error fetching race events:", error);
     throw error;
   }
 };
@@ -114,7 +115,7 @@ export const getRaceEventById = async (re_id) => {
     );
     return /** @type {DbRaceEvent | null} */ (result);
   } catch (error) {
-    console.error("Error fetching race event by ID:", error);
+    debugLog("ERROR", "Error fetching race event by ID:", error);
     throw error;
   }
 };
@@ -166,7 +167,7 @@ export const updateRaceEvent = async (
       [re_event_name, re_event_visibility, re_event_start_date_and_time, re_event_end_date_and_time, re_event_random_id_edit, re_event_random_id_viewer, re_viewport_latitude, re_viewport_longitude, re_viewport_zoom, re_viewport_opacity, re_maplayer, re_marker_timeout, re_tail_timeout, re_flag_content, nb_participants, my_rp_key, re_id]
     );
   } catch (error) {
-    console.error("Error updating race event:", error);
+    debugLog("ERROR", "Error updating race event:", error);
     throw error;
   }
 };

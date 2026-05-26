@@ -1,4 +1,5 @@
 // @ts-check
+import { debugLog } from '../utils/logUtils';
 import { getDb } from './database';
 
 /**
@@ -26,10 +27,10 @@ export const addSession = async (
       `INSERT INTO session (se_id, se_user_id, se_expires_at) VALUES (?, ?, ?)`,
       [se_id, se_user_id, se_expires_at]
     );
-    console.log("Session added:", se_id);
+    debugLog("INFO", "Session added:", se_id);
     return se_id;
   } catch (error) {
-    console.error("Error adding session:", error);
+    debugLog("ERROR", "Error adding session:", error);
     throw error;
   }
 };
@@ -48,7 +49,7 @@ export const getSessionById = async (se_id) => {
     );
     return /** @type {DbSession | null} */ (result);
   } catch (error) {
-    console.error("Error fetching session by ID:", error);
+    debugLog("ERROR", "Error fetching session by ID:", error);
     throw error;
   }
 };
@@ -66,7 +67,7 @@ export const deleteSession = async (se_id) => {
       [se_id]
     );
   } catch (error) {
-    console.error("Error deleting session:", error);
+    debugLog("ERROR", "Error deleting session:", error);
     throw error;
   }
 };

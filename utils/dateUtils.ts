@@ -1,4 +1,3 @@
-
 // Format a timestamp into a human-readable date and time string
 export const formatDateTime = (timestamp: number): string => {
     const intDate = parseInt(timestamp.toString(), 10);

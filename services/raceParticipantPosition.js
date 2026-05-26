@@ -1,4 +1,5 @@
 // @ts-check
+import { debugLog } from '../utils/logUtils';
 import { getDb } from './database';
 
 /**
@@ -33,9 +34,9 @@ export const addRaceParticipantPosition = async (
       `INSERT INTO race_participant_position (rpp_rp_id, rpp_rp_key, rpp_date, rpp_latitude, rpp_longitude) VALUES (?, ?, ?, ?, ?)`,
       [rpp_rp_id, rpp_rp_key, rpp_date, rpp_latitude, rpp_longitude]
     );
-    console.log("Race participant position added for participant ID:", rpp_rp_id);
+    debugLog("INFO", "Race participant position added for participant ID:", rpp_rp_id);
   } catch (error) {
-    console.error("Error adding race participant position:", error);
+    debugLog("ERROR", "Error adding race participant position:", error);
     throw error;
   }
 };
@@ -54,7 +55,7 @@ export const getRaceParticipantPositionsByParticipantKey = async (rpp_rp_key) =>
     );
     return /** @type {DbRaceParticipantPosition[]} */ (result);
   } catch (error) {
-    console.error("Error fetching race participant positions by participant ID:", error);
+    debugLog("ERROR", "Error fetching race participant positions by participant ID:", error);
     throw error;
   }
 };
@@ -72,7 +73,7 @@ export const deleteRaceParticipantPositionsByParticipantId = async (rpp_rp_id) =
       [rpp_rp_id]
     );
   } catch (error) {
-    console.error("Error deleting race participant positions by participant ID:", error);
+    debugLog("ERROR", "Error deleting race participant positions by participant ID:", error);
     throw error;
   }
 };
