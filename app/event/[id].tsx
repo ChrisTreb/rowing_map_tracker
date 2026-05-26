@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Link, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { debugLog } from '../../utils/logUtils';
 
 
 export default function RaceScreen() {
@@ -39,23 +40,23 @@ export default function RaceScreen() {
       // --- Vérification de la réponse avant de tenter de parser JSON ---
       if (!response.ok) {
         const errorBody = await response.text();
-        console.error(`API Error for participants (Status: ${response.status} ${response.statusText}):`, errorBody);
+        debugLog("ERROR", `API Error for participants (Status: ${response.status} ${response.statusText}):`, errorBody);
         throw new Error(`Failed to fetch participants: ${response.status} ${response.statusText}`);
       }
       // --- Fin de la vérification ---
 
       const eventData: EventRacesWithParticipants = await response.json();
-      console.log('Event data fetched from API:', eventData);
+      debugLog("INFO", 'Event data fetched from API:', eventData);
 
       // Traiter les courses
       const racePromises = eventData.races.map(async (race: Race) => {
         const existingRace = await getRaceById(race.ra_id);
         if (!existingRace) {
           await addRace(race.ra_id, race.ra_re_id, race.ra_type, race.ra_name);
-          console.log(`Added race ${race.ra_name} (ID: ${race.ra_id}).`);
+          debugLog("INFO", `Added race ${race.ra_name} (ID: ${race.ra_id}).`);
         } else {
           await updateRace(race.ra_id, race.ra_re_id, race.ra_type, race.ra_name);
-          console.log(`Updated race ${race.ra_name} (ID: ${race.ra_id}).`);
+          debugLog("INFO", `Updated race ${race.ra_name} (ID: ${race.ra_id}).`);
         }
       });
 
@@ -73,7 +74,7 @@ export default function RaceScreen() {
             participant.rp_key,
             participant.rp_updated_at
           );
-          console.log(`Added participant ${participant.rp_key} (ID: ${participant.rp_id}).`);
+          debugLog("INFO", `Added participant ${participant.rp_key} (ID: ${participant.rp_id}).`);
         } else {
           // --- Correction de l'ordre des arguments ---
           await updateRaceParticipant(
@@ -86,16 +87,16 @@ export default function RaceScreen() {
             participant.rp_key,
             participant.rp_updated_at
           );
-          console.log(`Updated participant ${participant.rp_key} (ID: ${participant.rp_id}).`);
+          debugLog("INFO", `Updated participant ${participant.rp_key} (ID: ${participant.rp_id}).`);
         }
       });
 
       // Attendre que toutes les insertions/mises à jour de courses et de participants soient terminées
       await Promise.all([...racePromises, ...participantPromises]);
-      console.log('All races and participants synced.');
+      debugLog("INFO", 'All races and participants synced.');
 
     } catch (error) {
-      console.error('Error fetching or syncing race data from API:', error);
+      debugLog("ERROR", 'Error fetching or syncing race data from API:', error);
       throw error; // Propager l'erreur pour la gestion globale
     }
   }
@@ -105,29 +106,29 @@ export default function RaceScreen() {
       // Récupérez les détails de l'événement de course depuis la base de données locale
       const localRaceEvent = await getRaceEventById(currentEventId);
       setRaceEvent(localRaceEvent);
-      console.log('Race event récupéré depuis la base de données locale:', localRaceEvent);
+      debugLog("INFO", 'Race event récupéré depuis la base de données locale:', localRaceEvent);
 
       // Récupérer les courses en base de données associées à l'événement
       const localRaces = await getRacesByEventId(currentEventId);
       setDbRaces(localRaces);
-      console.log('Courses récupérées depuis la base de données locale:', localRaces);
+      debugLog("INFO", 'Courses récupérées depuis la base de données locale:', localRaces);
 
       // Récupérez les participants depuis la base de données locale pour les afficher
       const localParticipants = await getRaceParticipantsByEventId(currentEventId);
       setDbRaceParticipants(localParticipants);
-      console.log('Participants récupérés depuis la base de données locale:', localParticipants);
+      debugLog("INFO", 'Participants récupérés depuis la base de données locale:', localParticipants);
 
       // Récupérez les clés des participants de la base de données locale
       const localPhoneRpKeys = await getPhoneRpKeysByRaceEventId(currentEventId);
       setDbPhoneRpKeys(localPhoneRpKeys);
-      console.log('Phone RP Keys récupérées depuis la base de données locale:', localPhoneRpKeys);
+      debugLog("INFO", 'Phone RP Keys récupérées depuis la base de données locale:', localPhoneRpKeys);
 
       if (localPhoneRpKeys) {
         getLocalPhoneKeys(localPhoneRpKeys);
       }
 
     } catch (error) {
-      console.error('Error retrieving local data:', error);
+      debugLog("ERROR", 'Error retrieving local data:', error);
       throw error;
     }
   }
@@ -142,14 +143,14 @@ export default function RaceScreen() {
         keysArray.push(key);
       }
       setLocalKeys(keysArray);
-      console.log("Local keys array:", localKeys);
+      debugLog("INFO", "Local keys array:", localKeys);
     }
   }
 
   useEffect(() => {
     const initializeAndSync = async () => {
       if (eventId === null || isNaN(eventId)) {
-        console.error("Invalid or missing event ID.");
+        debugLog("ERROR", "Invalid or missing event ID.");
         setIsLoading(false);
         Alert.alert("Erreur", "L'événement n'existe pas.");
         return;
@@ -165,7 +166,7 @@ export default function RaceScreen() {
         await getLocalData(eventId);
 
       } catch (error) {
-        console.error('Error in initializeAndSync:', error);
+        debugLog("ERROR", 'Error in initializeAndSync:', error);
         Alert.alert("Erreur de synchronisation", "Une erreur est survenue lors de la synchronisation des données.");
       } finally {
         setIsLoading(false);

@@ -1,4 +1,5 @@
 // @ts-check
+import { debugLog } from '../utils/logUtils';
 import { getDb } from './database';
 
 /**
@@ -22,10 +23,10 @@ export const addRowingClub = async (rc_id, rc_name, rc_nickname) => { // Add rc_
       `INSERT INTO rowing_club (rc_id, rc_name, rc_nickname) VALUES (?, ?, ?)`, // Include rc_id in INSERT
       [rc_id, rc_name, rc_nickname]
     );
-    console.log("Rowing club added:", rc_id);
+    debugLog("INFO", "Rowing club added:", rc_id);
     return rc_id; // Return the provided ID
   } catch (error) {
-    console.error("Error adding rowing club:", error);
+    debugLog("ERROR", "Error adding rowing club:", error);
     throw error;
   }
 };
@@ -40,7 +41,7 @@ export const getRowingClubs = async () => {
     const result = await db.getAllAsync(`SELECT * FROM rowing_club`);
     return /** @type {DbRowingClub[]} */ (result);
   } catch (error) {
-    console.error("Error fetching rowing clubs:", error);
+    debugLog("ERROR", "Error fetching rowing clubs:", error);
     throw error;
   }
 };
@@ -59,7 +60,7 @@ export const getRowingClubById = async (rc_id) => {
     );
     return /** @type {DbRowingClub | null} */ (result);
   } catch (error) {
-    console.error("Error fetching rowing club by ID:", error);
+    debugLog("ERROR", "Error fetching rowing club by ID:", error);
     throw error;
   }
 };
@@ -79,7 +80,7 @@ export const updateRowingClub = async (rc_id, rc_name, rc_nickname) => {
       [rc_name, rc_nickname, rc_id]
     );
   } catch (error) {
-    console.error("Error updating rowing club:", error);
+    debugLog("ERROR", "Error updating rowing club:", error);
     throw error;
   }
 };
@@ -97,7 +98,7 @@ export const deleteRowingClub = async (rc_id) => {
       [rc_id]
     );
   } catch (error) {
-    console.error("Error deleting rowing club:", error);
+    debugLog("ERROR", "Error deleting rowing club:", error);
     throw error;
   }
 };
