@@ -87,6 +87,7 @@ const globalSaveParticipantPosition = async (
 const sendCurrentPositionToApi = async (rpp_rp_key: string, latitude: number, longitude: number) => {
   try {
     const participantPosition = new ClassPosition(latitude, longitude);
+    debugLog("INFO", `Posting position to API for participant ${rpp_rp_key}:`, participantPosition.toJSON());
 
     const response = await fetch(`${apiURL}/position/${rpp_rp_key}`, {
       method: 'POST',
