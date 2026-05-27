@@ -33,39 +33,33 @@ const EventCard = ({ event, onRefreshTrigger }: EventCardProps) => {
     fetchKeys();
   }, [event.re_id, onRefreshTrigger]); // Re-déclencher si l'ID de l'événement change ou une clé est ajoutée
 
-  const participantKeyView = associatedKeys?.map(key => key.prk_rp_key).join(", ") ?? ""; 
+  const participantKeyView = associatedKeys?.map(key => key.prk_rp_key).join(", ") ?? "";
 
   // Vérifier si l'événement est passé
   const isEventOver = event.re_event_end_date_and_time < new Date().getTime();
 
   return (
     <View style={[styles.card, isEventOver && styles.pastEventCard]}>
-      <View>
-        <Text style={styles.title}>{event.re_event_name}</Text>
-        <Text style={styles.text}>Participants: {event.nb_participants}</Text>
-        <Text style={styles.text}>
-          Début: {formatDateTime(event.re_event_start_date_and_time)}
-        </Text>
-        <Text style={styles.text}>
-          Fin: {formatDateTime(event.re_event_end_date_and_time)}
-        </Text>
-        {/* Afficher toutes les clés associées de la DB locale */}
-        {!keysLoading && associatedKeys && associatedKeys.length > 0 && (
-          <Text style={styles.textKey}>
-            {/* Envelopper Ionicons dans un <Text> séparé pour éviter l'erreur */}
-            <Text><Ionicons name="key" size={18} color="#0A0F0E" /></Text> {participantKeyView}
+      <Link href={{ pathname: "/event/[id]", params: { id: event.re_id } }} style={{ width: "100%"}}>
+        <View>
+          <Text style={styles.title}>{event.re_event_name}</Text>
+          <Text style={styles.text}>Participants: {event.nb_participants}</Text>
+          <Text style={styles.text}>
+            Début: {formatDateTime(event.re_event_start_date_and_time)}
           </Text>
-        )}
-        {keysLoading && <ActivityIndicator size="small" color="#007bff" />}
-      </View>
-      <View style={styles.linkContainer}>
-        {/* Envelopper Ionicons dans un <Text> à l'intérieur du Link */}
-        <Link href={{ pathname: "/event/[id]", params: { id: event.re_id } }} >
-          <Text>
-            <Ionicons name="play-circle-outline" size={45} color="#E3E5E7" />
+          <Text style={styles.text}>
+            Fin: {formatDateTime(event.re_event_end_date_and_time)}
           </Text>
-        </Link>
-      </View>
+          {/* Afficher toutes les clés associées de la DB locale */}
+          {!keysLoading && associatedKeys && associatedKeys.length > 0 && (
+            <Text style={styles.textKey}>
+              {/* Envelopper Ionicons dans un <Text> séparé pour éviter l'erreur */}
+              <Text><Ionicons name="key" size={18} color="#0A0F0E" /></Text> {participantKeyView}
+            </Text>
+          )}
+          {keysLoading && <ActivityIndicator size="small" color="#007bff" />}
+        </View>
+      </Link>
     </View>
   );
 };
@@ -112,20 +106,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     color: "#0A0F0E",
     backgroundColor: "#A7C7D2",
-  },
-  linkContainer: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#216161",
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
   },
 });
 
